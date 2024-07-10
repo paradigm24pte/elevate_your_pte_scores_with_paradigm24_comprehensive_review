@@ -1,0 +1,440 @@
+/*
+ * image
+*/
+h1{
+    font-size: 20px;
+}
+#leftColumn #fileDetail .fromLink{
+    color:#008000;
+}
+#rightColumn #userInfo{
+    min-height:50px;
+    margin-bottom:20px;
+}
+#rightColumn #userInfo .icon{
+    position:absolute;
+}
+#fileDetail{
+    margin-bottom: 40px;
+}
+.imageFrame{
+    float: left;
+    margin: 0 0 10px 0;
+    max-width: 555px;
+    overflow:hidden;
+}
+.imageFrame img{
+    border: 1px solid #bbb;
+    padding: 1px;
+    background-color:#fff;
+	max-width:550px;
+}
+.description{
+    color: #444;
+}
+#actions{
+    height: 24px;
+    margin-top: 10px;
+    margin-bottom: 5px;
+    clear: both;
+}
+#actions li{
+    float: left;
+    margin-right: 10px;
+}
+#actions li a{
+    color: #666;
+}
+#actions li a:hover{
+    color: #fff;
+}
+
+#actions li a img{
+    float: left;
+    margin-top: 4px;
+    margin-right: 3px;
+}
+
+#actions li a b{
+    background-image: url(/images/action-icons.png);
+    background-repeat: no-repeat;
+    display: block;
+    float: left;
+    height: 16px;
+    margin-right: 3px;
+    margin-top: 2px;
+    width: 16px;  
+}
+.actionEdit b{
+    background-position: 0 0;
+}
+.actionDelete b{
+    background-position: -16px 1px;
+}
+.actionShare b{
+    background-position: -32px 1px;
+}
+#actions .like b{
+    background-position: 0 -16px;
+}
+#actions .unlike b{
+    background-position: 0 -32px;
+}
+.actionSave b{
+    background-position: -32px -16px;
+}
+.actionBury b{
+    background-position: -16px -16px;
+}
+.actionOriginalSize b{
+    background-position: -48px 0;
+}
+.actionUnlike b{
+    background-position: 0 -32px;
+}
+.quoteInfo{
+    color: #008000;
+    float: left;
+    margin-right: 10px;
+}
+.imageCopyright{
+    font-size: 12px;
+    color: #999;
+}
+/*
+ * comment
+*/
+#comments{
+    margin-top: 60px;
+}
+#comments h3{
+    font-size: 14px;
+    padding:10px;
+    border-top: 1px solid #fff;
+}
+#comments .avatarLink{
+    width: 34px;
+    padding: 1px 0;
+    text-align:center;
+    border: 1px solid #bbb;
+    left: 0;
+    float: left;
+    overflow: hidden;
+}
+#comments .avatarLink:hover{
+    border-color: #0044cc;
+}
+#comments .avatarLink img{
+    width: 32px;
+}
+#comments .bItem, .aItem, .sItem{
+    color: #444;
+}
+#comments .aItem{
+    border-bottom: 1px solid #ddd;
+    border-top: 1px solid #fff;
+    margin: 0;
+    padding: 10px;
+}
+#comments .cContent, .cBody, .cInfo{
+    margin-left: 45px;
+    color: #333;
+    overflow:visible;
+    display:block;
+}
+#comments .cInfo{color:#888;font-size: 12px;}
+#comments .cTime{color:#888;}
+#comments .removeLink{
+    float: right;
+    color: #7777cc;
+}
+#commentForm{
+    zoom: 1;
+    margin: 0 10px;
+}	
+#commentForm .btnRow {
+    margin-top:10px;
+}
+
+#userInfo p{
+    margin-left: 60px;
+}
+#recentImages a.thumbnail{
+    display: block;
+    float: left;
+    margin: 0 4px 6px 2px;
+    border: 1px solid #bbb;
+}
+#recentImages a.thumbnail:hover{
+    border-color: #888;
+}
+#recentImages a.thumbnail img{
+    width:80px;
+    height:60px;
+}
+#recentImages .contentInner{
+    padding: 7px;
+}
+.sideBox .bOptions{
+    padding-top: 0;
+}
+
+h1.private {
+    background:url("/images/lock-small.gif") no-repeat scroll 0 7px transparent;
+    padding-left:10px;
+}
+.cBody textarea{
+    height: 80px;
+    width: 500px;
+}
+.itemBookmark, .itemImage{
+    margin-left: 50px;
+}
+.itemBookmark .annotations .imageAnnotation img{
+    height:auto;
+    width:auto;
+}
+.itemBookmark .fromLink{
+    color:#008000;
+}
+.itemBookmark .annotations .imageAnnotation{
+    float:none;
+}
+.itemBookmark .annotations .imageAnnotation a{
+    margin-right: 10px;
+}
+#itemType{
+    float: left;
+}
+#itemType.itemTypeIcon{
+    position: relative;
+    width: 39px;
+    height: 48px;
+}
+#itemType.itemTypeIcon .favicon{
+    position: absolute;
+    right: 4px;
+    bottom: 4px;
+    width: 16px;
+    height: 16px;
+}
+#annotations{
+    margin-top: 10px;
+    margin-left: 0;
+}
+#commentsContent{
+    background-color: #f5f5f5;
+    border-top: 1px solid #ddd;
+}
+#actions a{
+    color: #777;
+}
+#actions a:hover{
+    color:#000;
+}
+
+/******************************
+	New & Edit Item
+******************************/
+/*Common*/
+#newItemBody{
+    width:550px;
+}
+#newItemBodyInner{
+    background-color: #eceff5;
+    border: 1px solid #dcdfe6;
+    padding: 10px;
+    margin-bottom: 20px;
+}
+#newItemBody .itemAttr{
+    margin-bottom:10px;
+}
+#newItemBody .inputTxt2{
+    width: 520px;
+}
+#newItemBody label {
+    color:#606060;
+    display:block;
+    font-weight:bold;
+    padding-bottom:2px;
+}
+#newItemBody .checkboxLable{
+    display : inline;
+    margin-left:5px;
+}
+#newItemBody .privacy{
+    float: right;
+}
+#newItemBody .privacy label{
+    background : url("/images/lock-small.gif") no-repeat scroll 0 4px transparent;
+    padding-left : 10px;
+}
+#newItemBody .tailTip{
+    display : block;
+    color: #909090;
+}	
+#newItemBody .submitButton{
+    margin-top:20px;
+    width:auto;
+    padding:5px;
+}
+#newItemBody .moreOptionHandler{
+    margin-top:20px;
+}
+#newItemBody .moreOptionsEoc{
+    padding-left:10px;
+    padding-right: 5px;
+    color:#0044cc;
+    background:url("/images/more-options-arrow.gif") no-repeat -2px -46px;
+    font-size:12px;
+}
+#newItemBody .moreOptionsEoc.expand{
+    background-position: -1px 3px;
+}
+#newItemBody .moreOptions{
+    margin-top: 10px;
+}
+#newItemBody .buttonRow{
+    margin-top: 10px;
+    border-top: 1px solid #dcdfe6;
+}
+#newItemBody .buttonRowInner{
+    border-top: 1px solid #f5f5f5;
+    padding-top: 12px;
+}
+#newItemBody .buttonRow .promptButton, #newItemBody .buttonRow .promptButton3{
+    float: right;
+}
+
+/* Bookmark */
+#newBookmarkForm .privacy{
+    float: none;
+}
+
+#newBookmarkForm .buttonRowInner{
+    border: none;
+    padding: 0;
+}
+
+#newBookmarkForm .inputTxt2{
+    width: auto;
+}
+
+#newBookmarkForm th{
+    padding-top: 2px;
+}
+
+#newBookmarkForm label{
+    display: inline;
+    padding: 0;
+}
+
+#newBookmarkForm .moreOptions{
+    margin-top: 0;
+}
+
+/*
+Note
+*/
+#note_form #note_textarea{
+    height:180px;
+}
+#note_form #note_title_label{
+    display:inline;
+}
+#note_form #note_title_input{
+    padding:2px;
+    width: 520px;
+}
+#note_form .showNoteTitle{
+    border:1px solid #eceff5;
+    color:#606060;
+    background-color: #eceff5;
+}
+#note_form .showNoteTitle:hover{
+    background-color : #fff;
+    border-color: #fff;
+     color:#000;
+}
+
+/*
+Upload File
+*/
+#flashFileQueue{
+    background-color: #fff;
+    border: 1px solid #ddd;
+    border-bottom-color: #e7e7e7;
+    margin-bottom: 10px;
+}
+#flashFileQueue .uploadifyQueueItem{
+    margin-top:0;
+    border:none;
+}
+#flashFileQueue .uploadifyError{
+    border : none;
+}
+#flashFileQueue #boxHeader, #flashFileQueue #boxFooter, #normalFileQueue #boxFooterBasic{
+    background:url("/images/bar-bg.png") repeat-x scroll left top #EEEEEE;
+    color:#606060;
+    font-size:12px;
+    font-weight:700;
+    height:30px;
+    line-height:30px;
+}
+#flashFileQueue #boxHeader{
+    border-bottom: 1px solid #b8b8b8;
+}
+#flashFileQueue #boxHeader .uploadFilesDetail{
+    float:right;
+    margin-right: 10px;
+}
+
+#flashFileQueue #queueBox{
+    border-top: 1px solid #e7e7e7;
+    height: 300px;
+    width:100%;
+    overflow: auto;
+}
+#flashFileQueue #queueBox #boxTail{
+    color : #666;
+    margin : 20px;
+}
+#flashFileQueue #boxFooter, #normalFileQueue #boxFooterBasic{
+    border-top: 1px solid #dcdcdc;
+    border-bottom: 1px solid #b8b8b8;
+    padding: 0 10px;
+}
+#normalFileQueue{
+    background-color: #fff;
+    border: 1px solid #ddd;
+    border-bottom-color: #e7e7e7;
+    margin-bottom: 10px;
+}
+#normalFileQueue #fileQueue{
+    height: 350px;
+    width:100%;
+    overflow: auto;
+}
+#normalFileQueue #fileQueue .itemAttr{
+    margin: 10px;
+    width:auto;
+}
+#uploadFile #normalFileQueue .private{
+    background:url("/images/lock-small.gif") no-repeat scroll 0 4px transparent;
+}
+#flashFileQueue .uploadifyQueueItem{
+    width: auto;
+}
+.bottomTip{
+    font-size: 12px;
+    color:#909090;
+    margin-top: 20px;
+    text-align: right;
+}
+
+/*
+ * Override
+ *---------------------------------------------------------------------------------------*/
+.annotations .imageAnnotation a{
+    margin-bottom: 10px;
+}

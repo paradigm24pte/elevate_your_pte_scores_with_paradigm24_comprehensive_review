@@ -1,0 +1,4861 @@
+var _items = [];
+var _groups = [];
+var _moreActionSelectCount = 2;
+var _batchActionEnabled = true;
+var _shareToGroupSelectCount = 2;
+_GLOBAL_VAR['ditems'] = [];
+_GLOBAL_VAR['checkedItemCount'] = 0;
+_GLOBAL_VAR["bACCID"] = "ditemShareToACC";
+_GLOBAL_VAR["pgHint"] = "Add a Group Comment";
+
+/*-------------------------------------
+ * client models
+ *------------------------------------*/
+var Ditem = Class.create({
+    initialize : function() {
+        this.checked = false;
+        this.hasDetails = false;
+        this.c_count = 0;
+        this.pri_c_count = 0;
+        this.pub_c_count = 0;
+        this.pri_a_count = 0;
+        this.pub_a_count = 0;
+        this.pri_sticky_count = 0;
+        this.pub_sticky_count = 0;
+        this.comments = [];
+        this.annotations = [];
+        this.groups = [];
+        this.details_count = function() {
+            var count = 0;
+            count += this.pri_c_count;
+            count += this.pub_c_count;
+            count += this.pri_a_count;
+            count += this.pub_a_count;
+            count += this.pri_sticky_count;
+            count += this.pub_sticky_count;
+            return count;
+        }
+    }
+});
+var Comment = Class.create({
+    initialize : function(){}
+});
+var Annotation = Class.create({
+    initialize : function() {
+        this.stickyNotes = [];
+        this.s_count = 0;
+    }
+});
+var StickyNote = Class.create({
+    initialize : function(){}
+});
+    
+/*------------------------------------------
+ * expand and collapse
+ *-----------------------------------------*/
+function switchDetails(index, eoc) {
+    var el = $("ditemDetails_"+index);
+    var eocItem = $("eoc_"+index);
+    if(typeof(eoc)=="undefined") eoc = null;
+    if(eoc) {
+        if(eoc=="collapse") {
+            el.hide();
+            if(eocItem){
+                eocItem.innerHTML = eocItem.innerHTML.replace(DIS_6, DIS_7);
+            }
+            _GLOBAL_VAR['ditems'][index].expand = false;
+            switchCEditor(index, "collapse");
+        }else {
+            el.show();
+            if(eocItem){
+                eocItem.innerHTML = eocItem.innerHTML.replace(DIS_7, DIS_6);
+            }
+            _GLOBAL_VAR['ditems'][index].expand = true;
+        }
+    }else {
+        if(el.visible()) {
+            el.hide();
+            if(eocItem){
+                eocItem.innerHTML = eocItem.innerHTML.replace(DIS_6, DIS_7);
+            }
+            _GLOBAL_VAR['ditems'][index].expand = false;
+            switchCEditor(index, "collapse");
+        }else {
+            el.show();
+            if(eocItem){
+                eocItem.innerHTML = eocItem.innerHTML.replace(DIS_7, DIS_6);
+            }
+            _GLOBAL_VAR['ditems'][index].expand = true;
+        }
+    }
+    checkEOCStatus();
+}
+function expandOrCollapse() {
+    switchDetails(arguments[0]);
+}
+function switchExpandOrCollapseAll() {
+    if(_GLOBAL_VAR['expand']) {
+        expandOrCollapseAll(false);
+        _GLOBAL_VAR['expand'] = false;
+        var i = 0;
+        var s = $("EOCSwitcher_"+i);
+        while(s) {
+            s.innerHTML = DIS_8;
+            i++;
+            s = $("EOCSwitcher_"+i);
+        }
+    }else {
+        expandOrCollapseAll(true);
+        _GLOBAL_VAR['expand'] = true;
+        var i = 0;
+        var s = $("EOCSwitcher_"+i);
+        while(s) {
+            s.innerHTML = DIS_9;
+            i++;
+            s = $("EOCSwitcher_"+i);
+        }
+    }
+}
+
+function expandOrCollapseAll(expand) {
+    if(expand) {
+        for(var index=0; index<_GLOBAL_VAR['ditems'].length; index++) {
+            if(!_GLOBAL_VAR['ditems'][index].hasDetails) continue;
+            $("ditemDetails_"+index).show();
+            $("showDetailsButton_"+index).hide();
+            _GLOBAL_VAR['ditems'][index].expand = true;
+        }
+        _GLOBAL_VAR['expand'] = true;
+        var i = 0;
+        var s = $("EOCSwitcher_"+i);
+        while(s) {
+            //s.innerHTML = DIS_9;
+            i++;
+            s = $("EOCSwitcher_"+i);
+        }
+        setDefaultEC('14')
+    }else {
+        for(var index=0; index<_GLOBAL_VAR['ditems'].length; index++) {
+            if(!_GLOBAL_VAR['ditems'][index].hasDetails) continue;
+            $("ditemDetails_"+index).hide()
+            $("showDetailsButton_"+index).show();
+            _GLOBAL_VAR['ditems'][index].expand = false;
+        }
+        _GLOBAL_VAR['expand'] = false;
+        var i = 0;
+        var s = $("EOCSwitcher_"+i);
+        while(s) {
+            //s.innerHTML = DIS_8;
+            i++;
+            s = $("EOCSwitcher_"+i);
+        }
+        setDefaultEC('13')
+    }
+}
+function checkEOCStatus() {
+    var expand = false;
+    var collapse = false
+    for(var i=0; i<_GLOBAL_VAR['ditems'].length; i++) {
+        if(!_GLOBAL_VAR['ditems'][i]) continue;
+        if(_GLOBAL_VAR['ditems'][i].expand) {
+            expand = true;
+        }else {
+            collapse = true;
+        }
+    }
+    if(expand && !collapse) {
+        _GLOBAL_VAR['expand'] = true;
+        var i=0;
+        while($("EOCSwitcher_"+i)){
+            $("EOCSwitcher_"+i).innerHTML = DIS_9;
+            i++;
+        }
+    }else if(!expand && collapse) {
+        _GLOBAL_VAR['expand'] = false;
+        var i=0;
+        while($("EOCSwitcher_"+i)){
+            $("EOCSwitcher_"+i).innerHTML = DIS_8;
+            i++;
+        }
+    }
+}
+/*------------------------------------------
+ * ditem checker
+ *-----------------------------------------*/
+function checkItem() {
+    var index = arguments[0];
+    var checker = $("ditemChecker_"+index);
+    var allChecker = $("ditemCheckerAll");
+    if(checker.checked) {
+        _GLOBAL_VAR['ditems'][index].checked = true;
+        _GLOBAL_VAR['checkedItemCount']++;
+        if(isAllSelected()) {
+            allChecker.checked = true;
+        }
+    }else {
+        allChecker.checked = false;
+        _GLOBAL_VAR['ditems'][index].checked = false;
+        _GLOBAL_VAR['checkedItemCount']--;
+    }
+}
+function isAllSelected() {
+    if(_GLOBAL_VAR['checkedItemCount']==_GLOBAL_VAR['ditems'].length){
+        return true;
+    }
+    else{
+        return false;
+    }
+}
+function checkItems() {
+    var allChecker = this;
+    var index = 0;
+    for(var i=0; i<_GLOBAL_VAR['ditems'].length; i++) {
+        var checker = $("ditemChecker_"+i);
+        if(!checker) {
+            continue;
+        }
+        if(checker.checked!=allChecker.checked) {
+            checker.click();
+        }
+    }
+}
+function resetChecker(index) {
+}
+function resetAllChecker() {
+}
+function isCheckedAll() {
+    if($("ditemCheckerAll").checked) {
+        return true;
+    }else {
+        return false;
+    }
+}
+/*------------------------------------------
+ * annotation
+ *-----------------------------------------*/
+function switchCEditor(args) {
+    var index = args['index'];
+    var cEditor = $("cEditor_"+index);
+    if(cEditor) {
+        if($("cEditor_"+index).innerHTML == "") {
+            $("cEditor_"+index).appendChild(createCEditor(args));
+        }
+        if(args['eoc']) {
+            if(args['eoc']=="collapse") {
+                cEditor.hide();
+            }else {
+                cEditor.show();
+                if(args['show_details']){
+                    switchDetails(index, "expand");
+                }
+                initCEditor(args);
+            }
+        }else {
+            if(cEditor.style.display=="") {
+                cEditor.hide();
+            }else {
+                cEditor.show();
+                if(args['show_details']){
+                    switchDetails(index, "expand");
+                }
+                initCEditor(args);
+            }
+        }
+    }
+}
+function onlyCommentTo(index) {
+    var noticer = $("cEditorNoticer_"+index);
+    if(this.checked) {
+        showNoticer(noticer, "Send a message to "+_GLOBAL_VAR['ditems'][index].real_name);
+    }else {
+        showNoticer(noticer, WORD_36);
+    }
+}
+function createCEditor(args) {
+    var index = args['index'];
+    var form = new Element("form", {
+        id:"cEditForm_"+index,
+        className: "webFormA",
+        method:"post",
+        "autocomplete":"off"
+    });
+    var cType = new Element("input", {
+        "type":"hidden",
+        "name":"cType",
+        "value":args['cType']
+    });
+    form.appendChild(cType);
+    var set = new Element("fieldset");
+    var ul = new Element("ul");
+    var li;
+    if(args['cType']=='my') {
+        li = new Element("li");
+        var sel = new Element("select", {
+            name:"privacy",
+            id:"cModeSelector_"+index
+        });
+        sel.update("<option value='c_public'>Public</option><option value='c_private'>Private</option>");
+        sel.onchange = changeCMode.bind(sel, index);
+        li.appendChild(sel);
+        var span = new Element("span", {
+            id:'cEditorNoticer_'+index,
+            className:'commentNoticer'
+        });
+        li.appendChild(span);
+        ul.appendChild(li);
+    }else{
+        li = new Element("li");
+        var span = new Element("span", {
+            id:'cEditorNoticer_'+index,
+            className:'commentNoticer'
+        });
+        li.appendChild(span);
+        ul.appendChild(li);
+    }
+    li = new Element("li");
+    var txtA = new Element("textarea", {
+        name:"cContent",
+        id:"cContent_"+index
+    });
+    li.appendChild(txtA);
+    ul.appendChild(li);
+    li = new Element("li", {
+        className:"bottomBtn"
+    });
+    if(args['cType']=='friend') {
+        var checker = new Element("label", {
+            className:"bottomChecker"
+        });
+        checker.update("<input type='checkbox' id='only_comment_"+index+"' onclick='onlyCommentTo.bind(this)("+index+")' name='only_comment_to_friend' />To " + _GLOBAL_VAR['ditems'][index].real_name + " only");
+        li.appendChild(checker);
+    }
+    var subBtn = new Element("input", {
+        id:"commentSubBtn_"+index,
+        className:"diigoBtn firstIBtn",
+        type:"submit",
+        value:"Add Comment"
+    })
+    li.appendChild(subBtn);
+    var cancelBtn = new Element("input", {
+        id:"commentCancelBtn_"+index,
+        className:"diigoBtn secondIBtn",
+        type:"button",
+        value:"Cancel"
+    });
+    cancelBtn.onclick = switchCEditor.bind(this, {
+        index:index,
+        eoc:'collapse'
+    });
+    li.appendChild(cancelBtn);
+    ul.appendChild(li);
+    set.appendChild(ul);
+    form.onsubmit = postComment.bind(form, args);
+    form.appendChild(set);
+    return form;
+}                   
+function refreshDetailsCount(index) {
+    var item = $("eoc_"+index);
+    if(item) {
+        var counter = $("dCount_"+index);
+        var details_count = _GLOBAL_VAR['ditems'][index].details_count();
+        if(details_count>0) {
+            _GLOBAL_VAR['ditems'][index].hasDetails = true;
+            counter.innerHTML = details_count;
+            item.show();
+        }else {
+            _GLOBAL_VAR['ditems'][index].hasDetails = false;
+            item.hide();
+        }
+    }
+}
+
+function postComment(args) {       
+    var index = args['index'];
+    var cContent = $("cContent_"+index);
+    if(cContent.value.trim()=="") {
+        cContent.focus();
+        return false;
+    }
+    args['only_comment_to_friend'] = this.only_comment_to_friend ? this.only_comment_to_friend.checked : false;
+    args['content'] = cContent.value;
+    if(args['cType']=='friend' && args['only_comment_to_friend']) {
+        var url = "/message_mana/send_msg";
+        var json = {
+            "send_type":"some",
+            "send_to":{
+                "friends":[_GLOBAL_VAR['ditems'][args['index']].u_name]
+            },
+            "privacy":"private",
+            "subject":_GLOBAL_VAR['ditems'][args['index']].title,
+            "message":cContent.value
+        };
+        postCommentLoading(index);
+        new Ajax.Request(url,
+        {
+            asynchronous:true,
+            evalScripts:false,
+            onComplete:function(request){
+                postCommentComplete(request, args)
+            },
+            parameters:"json="+encodeURIComponent(Object.toJSON(json))
+        });
+        
+    }else {
+        
+        var url = '/annotation_mana/post_comment';
+        var params = Form.serialize(this);
+        var ttitle = encodeURIComponent(_GLOBAL_VAR['ditems'][args['index']].title);
+        var to = _GLOBAL_VAR['ditems'][args['index']].user_id;
+        params += "&to="+to+"&thread_title="+ttitle+"&link_id="+_GLOBAL_VAR['ditems'][index].link_id+"&user_id="+_GLOBAL_VAR['ditems'][index].user_id;
+        if(args['cType']=='my') {
+            var cMode = this.privacy.value=="c_private" ? "2" : "0"
+            params += "&cMode="+cMode;
+        }else {
+            var cMode = "0";
+        }
+        postCommentLoading(index);
+        new Ajax.Request(url,
+        {
+            asynchronous:true,
+            evalScripts:false,
+            onComplete:function(request){
+                postCommentComplete(request, args)
+            },
+            parameters:params
+        });
+    }
+    return false;
+} 
+
+function postCommentLoading(index) {  
+    //showNoticer($("cEditorNoticer_"+index), WORD_3);
+    switchCEditorToPosting(index);
+}
+function switchCEditorToPosting(index) {     
+    var submitBtn = $("commentSubBtn_"+index);
+    submitBtn.value = WORD_3;
+    submitBtn.disabled = true;
+    $("commentCancelBtn_"+index).disabled = true;
+}    
+function switchCEditorToEdit(index) {     
+    var submitBtn = $("commentSubBtn_"+index);
+    submitBtn.disabled = false;
+    submitBtn.value = "Add Comment";
+    $("commentCancelBtn_"+index).disabled = false;
+}
+
+function postStickyNote() {       
+    var index = arguments[0];
+    var indexA = index.split("_");
+    var sContent = $("sContent_"+index);
+    if(sContent.value.trim()=="") {
+        sContent.focus();
+        return false;
+    }
+    var url = '/annotation_mana/post_sticky_note';
+    var params = Form.serialize(this);
+//    var sMode = this.privacy.value=="s_private" ? "2" : "0"
+    var sMode = "2";
+    params += "&link_id="+_GLOBAL_VAR['ditems'][indexA[0]].link_id+"&ann_id="+_GLOBAL_VAR['ditems'][indexA[0]].annotations[indexA[1]].id+"&sMode="+sMode
+    new Ajax.Request(url,
+    {
+        asynchronous:true,
+        evalScripts:true,
+        onLoading:function(request){
+            postStickyNoteLoading(request, index)
+        },
+        onComplete:function(request){
+            postStickyNoteComplete(request, index, sContent.value)
+        },
+        parameters:params
+    }
+    );
+    return false;
+} 
+function postStickyNoteLoading(request, index) {  
+    switchSEditorToPosting(index);
+}
+function switchSEditorToPosting(index) {     
+    var submitBtn = $("sSubBtn_"+index);
+    submitBtn.value = WORD_3;
+    submitBtn.disabled = true;
+    $("sCancelBtn_"+index).disabled = true;
+}    
+function switchSEditorToEdit(index) {     
+    var submitBtn = $("sSubBtn_"+index);
+    submitBtn.disabled = false;
+    submitBtn.value = "Add Sticky Note";
+    $("sCancelBtn_"+index).disabled = false;
+} 
+
+function postStickyNoteComplete(request, index, content) {
+    switchSEditorToEdit(index);
+    if(request.status == "200") {
+        $('addStickyNoteMenu_'+index).hide();
+        var respInfosA = request.responseText.split("&");
+        var respInfos = new Object();
+        for(var i=0; i<respInfosA.length; i++) {
+            var t = respInfosA[i].split("=");
+            if(t[0]=="content") t[1] = unescape(t[1]);
+            respInfos[t[0]] = t[1];
+        }
+        respInfos['content'] = displayCContent(content);
+        indexA = index.split("_");
+        var newComment = createNewStickyNote(respInfos, index);
+        if(newComment) {
+            var comments = $('stickyUL_'+index);
+            comments.appendChild(newComment);
+            if(comments.style.display=="none") {
+                comments.show();
+            }
+            switchSEditor(index);
+            
+            countDetails(indexA[0]);
+        }else {
+            showNoticer($("sEditorNoticer_"+index), WORD_4);
+        }
+    }else if(request.status=="403") {
+        authFailed();
+    }else {
+        showNoticer($("sEditorNoticer_"+index), WORD_4);
+    }
+} 
+function createNewStickyNote(respInfos, index) {  
+    indexA = index.split("_");
+    sIndex = index+"_"+_GLOBAL_VAR['ditems'][indexA[0]].annotations[indexA[1]].stickyNotes.length;
+    var li = new Element("li", {
+        id:"sticky_"+sIndex,
+        className:"sItem"
+    });
+    var div = new Element("span", {
+        className:"content"
+    }).update(respInfos['content']);
+    var span = new Element("span", {
+        className:"tail"
+    });
+    span.innerHTML += " - ";
+    span.appendChild(new Element("a", {
+        href:"/user/"+respInfos['u_name']
+    }).update(respInfos['u_name']));
+    span.innerHTML += " "+respInfos['created_at'];
+    span.innerHTML += " - <a class=\"tailAction\" href=\"javascript:void(0)\" onclick=\"doEditStickyNote('"+sIndex+"')\">Edit</a>";
+    span.innerHTML += " - <a href=\"javascript:void(0);\" class=\"tailAction\" onclick=\"doRemoveStickyNote('"+sIndex+"')\" >Remove</a>";
+    li.appendChild(div);
+    li.appendChild(span);
+    var stickyNote = new StickyNote();
+    stickyNote.id = respInfos['id']
+    stickyNote.u_name = respInfos['u_name'];
+    stickyNote.mode = respInfos['mode'];
+    stickyNote.link_id = respInfos['link_id'];
+    stickyNote.content = respInfos['content'];
+    addStickyNoteToJson(stickyNote, index);
+    return li;
+} 
+
+// add json comment to client model
+function addStickyNoteToJson(stickyNote, index) {
+    var indexA = index.split("_");
+    var removeA = $("removeA_"+indexA[0]+"_"+indexA[1]);
+    if(_GLOBAL_VAR['ditems'][indexA[0]].annotations[indexA[1]].s_count==0) {
+        _GLOBAL_VAR['ditems'][indexA[0]].annotations[indexA[1]]['mode'] = stickyNote['mode'];
+        changeHighlightColor(indexA[0]+"_"+indexA[1], stickyNote['mode']);
+    }
+    _GLOBAL_VAR['ditems'][indexA[0]].annotations[indexA[1]].stickyNotes.push(stickyNote);
+    _GLOBAL_VAR['ditems'][indexA[0]].annotations[indexA[1]].s_count++;
+    if(stickyNote['mode']=="0") {
+        _GLOBAL_VAR['ditems'][indexA[0]].pub_sticky_count++;
+        if(removeA) removeA.style.display = "none";
+    }else {
+        _GLOBAL_VAR['ditems'][indexA[0]].pri_sticky_count++;
+    }
+    refreshDetailsCount(indexA[0]);
+}
+
+function changeHighlightColor(index, mode) {
+    var highlight = $("highlight_"+index);
+    if(mode==0) {
+        highlight.className = highlight.className.replace("private", "public");
+    }else {
+        highlight.className = highlight.className.replace("public", "private");
+    }
+}
+
+
+function initCEditor(args) {
+    //$("cEditorBottom_"+index).show();
+    var content = $("cContent_"+args['index']) ;
+    content.disabled = false;
+    content.value = "";
+    content.focus();
+    args['mode'] = DEFAULT_C_MODE;
+    initCEditorMode(args)
+}   
+
+function initSEditor(index) {
+    var content = $("sContent_"+index);
+    content.disabled = false;
+    content.value = "";
+    content.focus();
+    var indexA = index.split("_");
+    var a = _GLOBAL_VAR['ditems'][indexA[0]].annotations[indexA[1]];
+    if(a.s_count!=0) {
+        initSEditorMode(index, a['mode'], true);
+    }else {
+        initSEditorMode(index, DEFAULT_S_MODE);
+    }
+}
+
+function displayCContent(content) {
+    return content.replace(/\r\n|\n|\r/g,"<br/>").replace(/<script/i, "&lt;script").replace(/<\/script/i, "&lt;/script");
+}
+
+function postCommentComplete(request, args) {
+    switchCEditorToEdit(args['index']);
+    if(request.status == "200") {
+        var respInfos = request.responseText.evalJSON();
+        respInfos['content'] = displayCContent(args['content']);
+        var comments = $('comments_'+args['index']);
+        comments.show();
+        switchCEditor({
+            'index':args['index'],
+            'eoc':"collapse"
+        });
+        var newComment = createNewComment(respInfos, args);
+        comments.appendChild(newComment);
+        countDetails(args['index']);
+    }else if(request.status=="403") {
+        authFailed();
+    }else {
+        showNoticer($("cEditorNoticer_"+index), WORD_4);
+    }
+    
+} 
+function createNewComment(respInfos, args) {  
+    var cIndex = args['index']+"_"+_GLOBAL_VAR['ditems'][args['index']].comments.length;
+    var li = new Element("li", {
+        id:"comment_"+cIndex,
+        className:"cItem"
+    });
+    if(!respInfos['tid'] || (args['cType']=='my' && respInfos['mode']==2)) {
+    }else {
+        var cAlert = new Element("span", {
+            className:"commentAlert"
+        });
+        if(args['only_comment_to_friend']){}else {}
+        var msg_url = MESSAGE_HOST+"/message/"+respInfos['tid'];
+        cAlert.update("You can visit the discussion thread here <a href='"+msg_url+"'>"+msg_url+"</a>");
+        li.appendChild(cAlert);
+    }
+    var privacy = $("cModeSelector_"+args['index']);
+    if(privacy && privacy.value=="c_private") {
+        li.addClassName("privateC");
+    }
+    var div = new Element("span", {
+        className:"cContent"
+    }).update(respInfos['content']);
+    var span = new Element("span", {
+        className:"tail"
+    });
+    //var spanOptions = new Element("span", {
+    //    className:"commentOption"
+    //    });
+    if(args['cType']=='friend' && args['only_comment_to_friend']) {
+    }else {
+    //spanOptions.innerHTML = "<span id='removeComment_"+cIndex+"' onclick=\"doRemoveComment('"+cIndex+"')\">Remove</span>";
+    }
+    //span.appendChild(spanOptions);
+    span.innerHTML += " - ";
+    span.appendChild(new Element("a", {
+        href:"/user/"+respInfos['u_name']
+    }).update(respInfos['u_name']));
+    span.innerHTML += " "+respInfos['created_at'];
+    span.innerHTML += " - <a href=\"javascript:void(0);\" class=\"tailAction\" onclick=\"doRemoveComment('"+cIndex+"')\">Remove</a>"
+    li.appendChild(div);
+    li.appendChild(span);
+    var comment = new Comment();
+    comment.id = respInfos['id'];
+    comment.mode = respInfos['mode'];
+    comment.u_name = respInfos['u_name'];
+    comment.link_id = respInfos['link_id'];
+    addCommentToJson(comment, args['index']);
+    return li;
+}    
+
+// add json comment to client model
+function addCommentToJson(comment, index) {
+    _GLOBAL_VAR['ditems'][index].comments.push(comment);
+    if(comment.mode=="0") {
+        _GLOBAL_VAR['ditems'][index].pub_c_count++;
+    }else {
+        _GLOBAL_VAR['ditems'][index].pri_c_count++;
+    }
+    refreshDetailsCount(index);
+}
+
+function addStickyNotes(index) {   
+    switchSEditor(index);
+}
+function cancelSEditor() {
+    switchSEditor(arguments[0]);
+}
+function switchSEditor(index) {
+    var sticky = $("sticky_"+index);
+    var sEditor = $("sEditor_"+index);
+    var opts = $("annotation_"+index).getElementsByClassName('hOpts')[0];
+    if($("sEditor_"+index).innerHTML == "") {
+        $("sEditor_"+index).appendChild(createSEditor(index));
+        initSEditorMode(index, DEFAULT_S_MODE);
+    }
+    if(sEditor.style.display=="") {
+        sEditor.style.display = "none";
+        var indexA = index.split("_");
+        if(_GLOBAL_VAR['ditems'][indexA[0]].annotations[indexA[1]].s_count==0) {
+            sticky.style.display = "none";
+        }
+        opts.show();
+    }else {
+        sEditor.style.display = "";
+        sticky.style.display = "";
+        initSEditor(index);
+        opts.hide();
+    }
+
+}
+
+function createSEditor(index) {
+    var form = new Element("form", {
+        id:"sEditForm_"+index,
+        className: "webFormA",
+        method:"post"
+    });
+    var set = new Element("fieldset");
+    var ul = new Element("ul");
+    var li = new Element("li");
+    var sel = new Element("select", {
+        name:"privacy",
+        id:"sModeSelector_"+index,
+        'class':"inputTxt2"
+    }).hide();
+    sel.update("<option value='s_private'>Private</option>");
+    sel.onchange = changeSMode.bind(sel, index);
+    var span = new Element("span", {
+        id:'sEditorNoticer_'+index,
+        className:'commentNoticer'
+    });
+    li.appendChild(sel);
+    li.appendChild(span);
+    ul.appendChild(li);
+    li = new Element("li");
+    var txtA = new Element("textarea", {
+        name:"sContent",
+        id:"sContent_"+index,
+        'class':'inputTxt2'
+    });
+    li.appendChild(txtA);
+    ul.appendChild(li);
+    li = new Element("li", {
+        className:"bottomBtn"
+    });
+    li.update("<input type='submit' class='diigoBtn firstIBtn' value='Add Sticky Note' id='sSubBtn_"+index+"' />");
+    var cancelBtn = new Element("input", {
+        id:"sCancelBtn_"+index,
+        className:"diigoBtn secondIBtn",
+        type:"button",
+        value:"Cancel"
+    });
+    cancelBtn.onclick = cancelSEditor.bind(cancelBtn, index);
+    li.appendChild(cancelBtn);
+    ul.appendChild(li);
+    set.appendChild(ul);
+    form.onsubmit = postStickyNote.bind(form, index);
+    form.appendChild(set);
+    return form;
+    
+} 
+
+function initSEditorMode(index, mode, disabled) {   
+    var selectItem = $("sModeSelector_"+index);
+    var noticer = $("sEditorNoticer_"+index);
+	
+	//only premium user can add public sticky note
+	if(document.cookie.match(/diigoandlogincookie=(.+?);/)[1].split("-.-")[3] == 0){
+		mode = "2";
+		disabled = true;
+	}	
+	
+    if(mode=="0") {
+        selectItem.value = "s_public";
+        showNoticer(noticer, WORD_8);
+    }else {
+        selectItem.value = "s_private";
+        hideNoticer(noticer);
+    }
+    selectItem.disabled = disabled;
+} 
+
+function initCEditorMode(args) {   
+    if(args['cType']=='my') {
+        var selectItem = $("cModeSelector_"+args['index']);
+        var noticer = $("cEditorNoticer_"+args['index']);
+        if(args['mode'] == "0") {
+            selectItem.value = "c_public";
+            showNoticer(noticer, WORD_36);
+        }else {
+            selectItem.value = "c_private";
+            showNoticer(noticer, WORD_37);
+        }
+    }else {
+        if(args['cType']=='friend') {
+            $("only_comment_"+args['index']).checked = false;
+        }
+        var noticer = $("cEditorNoticer_"+args['index']);
+        showNoticer(noticer, WORD_36);
+    }
+} 
+
+function changeCMode(index) {       
+    doCMode(index, $F("cModeSelector_"+index));
+}  
+
+function doCMode(index, mode) {
+    if(mode=="c_public") {
+        showNoticer($("cEditorNoticer_"+index), WORD_36);
+    }else {
+        showNoticer($("cEditorNoticer_"+index), WORD_37);
+    }
+} 
+
+function changeSMode(index) {       
+    doSMode(index, $F("sModeSelector_"+index));
+}  
+
+function doSMode(index, mode) {
+    if(mode=="s_public") {
+        showNoticer($("sEditorNoticer_"+index), WORD_8);
+    }else {
+        hideNoticer($("sEditorNoticer_"+index));
+    }
+}  
+function removeComment() {
+    var a = this.id.split("_");
+    doRemoveComment(a[1]+"_"+a[2]);
+}
+function doRemoveComment(index) {
+    if(!confirm(ALE_21)) return false;
+    var indexA = index.split("_");
+    var id = _GLOBAL_VAR['ditems'][indexA[0]].comments[indexA[1]].id;
+    var link_id = _GLOBAL_VAR['ditems'][indexA[0]].comments[indexA[1]].link_id
+    try{
+        var url = '/annotation_mana/remove_comment';
+        var params = "id="+id+"&link_id="+link_id;
+        new Ajax.Request(url,
+        {
+            asynchronous:true,
+            evalScripts:true,
+            onLoading:function(request){
+                doRemoveCommentLoading(request, index)
+            },
+            onComplete:function(request){
+                doRemoveCommentComplete(request, index)
+            },
+            parameters:params
+        }
+        );
+        return false;
+    }catch(e) {
+        return false;
+    }
+}
+function doRemoveCommentLoading(request, index) { 
+    $("comment_"+index).style.backgroundColor = "#eee";
+    var remover = $("removeComment_"+index);
+    remover.innerHTML = WORD_3;
+    remover.onclick = null;
+}   
+function doRemoveCommentComplete(request, index) { 
+    if(request.status=="200") {
+        var indexA = index.split("_");
+        var c_mode = _GLOBAL_VAR['ditems'][indexA[0]].comments[indexA[1]].mode;
+        delete(_GLOBAL_VAR['ditems'][indexA[0]].comments[indexA[1]]);
+        _GLOBAL_VAR['ditems'][indexA[0]].c_count--;
+        if(c_mode.mode=="0") {
+            _GLOBAL_VAR['ditems'][indexA[0]].pub_c_count--;
+        }else {
+            _GLOBAL_VAR['ditems'][indexA[0]].pri_c_count--;
+        }
+        refreshDetailsCount(indexA[0]);
+        Element.remove("comment_"+index);
+        
+        countDetails(indexA[0]);
+    }else {
+}
+}
+function doRemoveStickyNote(index) {   
+    if(!confirm(ALE_23)) return false;
+    var indexA = index.split("_");
+    var id = _GLOBAL_VAR['ditems'][indexA[0]].annotations[indexA[1]].stickyNotes[indexA[2]].id;
+    var url = '/annotation_mana/remove_sticky_note';
+    var link_id = _GLOBAL_VAR['ditems'][indexA[0]].annotations[indexA[1]].stickyNotes[indexA[2]].link_id;
+    var params = "id="+id+"&link_id="+link_id;
+    new Ajax.Request(url,
+    {
+        asynchronous:true,
+        evalScripts:true,
+        onLoading:function(request){
+            doRemoveStickyNoteLoading(request, index)
+        },
+        onComplete:function(request){
+            doRemoveStickyNoteComplete(request, index)
+        },
+        parameters:params
+    }
+    );
+    return false;
+} 
+function doRemoveStickyNoteLoading(request, index) { 
+    $("sticky_"+index).style.backgroundColor = "#eee";
+    var remover = $("removeStickyNote_"+index);
+    remover.innerHTML = WORD_3;
+    remover.onclick = null;
+}   
+function doRemoveStickyNoteComplete(request, index) {  
+    if(request.status=="200") {
+        var indexA = index.split("_");
+        var s_mode = _GLOBAL_VAR['ditems'][indexA[0]].annotations[indexA[1]].mode;
+        delete(_GLOBAL_VAR['ditems'][indexA[0]].annotations[indexA[1]].stickyNotes[indexA[2]]);
+        _GLOBAL_VAR['ditems'][indexA[0]].annotations[indexA[1]].s_count--;
+        if (s_mode=="0") {
+            _GLOBAL_VAR['ditems'][indexA[0]].pub_sticky_count--;
+        }else {
+            _GLOBAL_VAR['ditems'][indexA[0]].pri_sticky_count--;
+        }
+        refreshDetailsCount(indexA[0]);
+        if(_GLOBAL_VAR['ditems'][indexA[0]].annotations[indexA[1]].s_count<=0) {
+            $("sticky_"+indexA[0]+"_"+indexA[1]).style.display = "none";
+            $("addStickyNoteMenu_"+indexA[0]+"_"+indexA[1]).show();
+            changeHighlightColor(indexA[0]+"_"+indexA[1], 2);
+            var removeA = $("removeA_"+indexA[0]+"_"+indexA[1]);
+            if(removeA) removeA.style.display = "";
+        }
+    
+        Element.remove("sticky_"+index);
+        
+        countDetails(indexA[0]);
+    }else {
+}
+}
+function doEditStickyNote(index){
+    var stickyNote = $('sticky_'+index);
+    Element.insert(stickyNote,{after:createSEditForm(index)});
+    stickyNote.hide();
+}
+
+function createSEditForm(index){
+    var indexA = index.split("_");
+    var form = new Element("form",{
+        id:"sEditForm_"+index,
+        className:"webFormA",
+        method:"post"
+    });
+    var ul = new Element("ul");
+    var li = new Element("li");
+    var txtA = new Element("textarea", {
+        name:"content",
+        id:"sContent_"+index,
+        'class':'inputTxt2 stickyNoteArea'
+    });
+    txtA.value = _GLOBAL_VAR['ditems'][indexA[0]].annotations[indexA[1]].stickyNotes[indexA[2]].content;
+    li.appendChild(txtA);
+    ul.appendChild(li);
+    li = new Element("li", {
+    });
+    li.update("<input type='submit' class='diigoBtn firstIBtn' value='Submit' id='sSubBtn_"+index+"' />");
+    var cancelBtn = new Element("input", {
+        id:"sCancelBtn_"+index,
+        className:"diigoBtn secondIBtn",
+        type:"button",
+        value:"Cancel"
+    });
+    cancelBtn.onclick = removeSEditForm.bind(form,index);
+    li.appendChild(cancelBtn);
+    ul.appendChild(li);
+    form.onsubmit = doEditStickyNoteSubmit.bind(form,index);
+    form.appendChild(ul);
+    return form;
+}
+function removeSEditForm(){
+    var index = arguments[0];
+    $('sticky_'+index).show();
+    Element.remove($('sEditForm_'+index));
+}
+
+function doEditStickyNoteSubmit(){
+    var index = arguments[0];
+    var z = this;
+    var indexA = index.split("_");
+    var sContent = $('sContent_'+index);
+    if(sContent.value.trim()==""){
+        sContent.focus();
+        return false;
+    }
+    var url = '/annotation_mana/edit_sticky_note';
+    var id = _GLOBAL_VAR['ditems'][indexA[0]].annotations[indexA[1]].stickyNotes[indexA[2]].id;
+    var link_id = _GLOBAL_VAR['ditems'][indexA[0]].annotations[indexA[1]].stickyNotes[indexA[2]].link_id;
+    var params = Form.serialize(this);
+    params += "&id="+id+"&link_id="+link_id;
+    new Ajax.Request(url,
+        {
+            asynchronous:true,
+            evalScripts:true,
+            onComplete:function(request){
+                if(request.status == "200"){
+                    var content = JSON.parse(request.responseText).content;
+                    _GLOBAL_VAR['ditems'][indexA[0]].annotations[indexA[1]].stickyNotes[indexA[2]].content = content;
+                    $('sticky_'+index).select("span.content")[0].innerHTML = displayCContent(content);
+                    $('sticky_'+index).show();
+                    Element.remove($('sEditForm_'+index));
+
+                }
+            },
+            parameters:params
+        }
+    );
+
+    return false;
+}
+
+function countDetails(index) {        
+    var ditem = _GLOBAL_VAR['ditems'][index];
+    if(ditem.c_count!=0 || ditem.annotations.length!=0) {
+        ditem.hasDetails = false;
+    }else {
+        ditem.hasDetails = true;
+    }
+}
+function removeAnnotation(index) {
+    if(confirm(ALE_22)) {
+        var indexA = index.split("_");
+        var annotation = _GLOBAL_VAR['ditems'][indexA[0]].annotations[indexA[1]];
+        if((annotation.mode == 2) || (annotation.mode==0 && annotation.s_count==0)) {
+            doRemoveAnnotation(annotation);
+        }else {
+            alert(WORD_11)
+            return false;
+        }
+    }
+}
+
+function doRemoveAnnotation(annotation) {
+    var url = '/annotation_mana/remove_annotation';
+    var params = "ann_id="+annotation.id+"&link_id="+annotation.link_id;
+    showCentralNoticer(DIS_10);
+    new Ajax.Request(url,
+    {
+        asynchronous:true,
+        evalScripts:true,
+        onComplete:function(request){
+            doRemoveAnnotationComplete(request, annotation.index)
+        },
+        parameters:params
+    }
+    );
+    return false;
+}
+function doRemoveAnnotationComplete(request, index) {
+    hideCentralNoticer();
+    if(request.status=="200") {
+        var indexA = index.split("_");
+        var a_mode = _GLOBAL_VAR['ditems'][indexA[0]].annotations[indexA[1]].mode;
+        var s_count = _GLOBAL_VAR['ditems'][indexA[0]].annotations[indexA[1]].s_count
+        delete(_GLOBAL_VAR['ditems'][indexA[0]].annotations[indexA[1]]);
+        Element.remove("annotation_"+index);
+        if(a_mode=="0") {
+            _GLOBAL_VAR['ditems'][indexA[0]].pub_sticky_count -= s_count;
+            _GLOBAL_VAR['ditems'][indexA[0]].pub_a_count--;
+        }else {
+            _GLOBAL_VAR['ditems'][indexA[0]].pri_sticky_count -= s_count;
+            _GLOBAL_VAR['ditems'][indexA[0]].pri_a_count--;
+        }
+        refreshDetailsCount(indexA[0]);
+        
+        countDetails(indexA[0]);
+
+        var aCount = $("title_"+indexA[0]).select('.annotationsCount')[0];
+        aCount.textContent = parseInt(aCount.textContent)-1;
+
+    }else {
+}
+}
+
+function changeAnnotationColor(index,color){
+    var indexA = index.split("_");
+    var annotation = _GLOBAL_VAR['ditems'][indexA[0]].annotations[indexA[1]];
+    var color = color.replace("highlight_",'');
+    doChangeAnnotationColor(annotation,color);
+}
+
+function doChangeAnnotationColor(annotation,color){
+    var url = '/annotation_mana/change_annotation_color';
+    var params = "ann_id="+annotation.id+"&link_id="+annotation.link_id+"&color="+color;
+    showCentralNoticer(DIS_10);
+    new Ajax.Request(url,{
+        asynchronous:true,
+        evalScripts:true,
+        onComplete:function(request){
+            doChangeAnnotationColorComplete(request,annotation.index,color);
+        },
+        parameters:params
+    });
+    return false;
+}
+
+function doChangeAnnotationColorComplete(request,index,color){
+    hideCentralNoticer();
+    if(request.status=="200"){
+        var indexA = index.split("_");
+        var highlight = $("highlight_"+index);
+        var annotationMenu = $("annotationMenu_"+index);
+        highlight.removeClassName('highlight_blue').removeClassName('highlight_green').removeClassName('highlight_pink').removeClassName('highlight_yellow').addClassName('highlight_'+color);
+        annotationMenu.select('li a span').each(function(span){
+            span.update("");
+            if(span.className==color){
+                span.update("<b></b>");
+            }
+        });
+    }
+}
+
+/*------------------------------------
+ * menu
+ *-----------------------------------*/
+function batchExtract() {
+    var checkedBA = whichBChecked();
+    if(checkedBA.length==0) {
+        flashNotice2(ALE_20);
+        resetMoreAction();
+        return false;
+    }
+    var index_a = [];
+    for(var i=0; i<checkedBA.length; i++) {
+        index_a.push(checkedBA[i].index);
+    }
+    link_ids = [];
+    for(var k=0; k<index_a.length; k++) {
+        var index = index_a[k];
+        var ditem = _GLOBAL_VAR['ditems'][index];
+        link_ids.push(ditem.link_id);
+    }
+    window.open('/ditem_mana3/extract_annotations?link_ids='+link_ids.join(','), null, 'scrollbars=no,menubar=no,width=640,height=420,resizable=no,toolbar=no,location=no,status=no,screenX=200,screenY=100,left=200,top=100');
+    resetMoreAction();
+} 
+
+function extraA(i) {
+    window.open('/ditem_mana3/extract_annotations?link_ids='+_GLOBAL_VAR['ditems'][i].link_id, null, 'scrollbars=no,menubar=no,width=620,height=420,resizable=yes,toolbar=no,location=no,status=no,screenX=200,screenY=100,left=200,top=100');
+}
+function loadAnnotations(index_a) {
+    var contentOutter = new Element("blockquote", {
+        style:"margin:0",
+        className:"extraAContentOutter",
+        id:"extraAContentOutter"
+    });
+    contentOutter.update("<p><strong>Quotes:</strong></p>");
+    var content = new Element("div", {
+        className:"extraAContent",
+        id:"extraAContent",
+        style:"border-left: 2px solid #eee; padding-left:1em!important; margin-left:1em!important;"
+    });
+    for(var k=0; k<index_a.length; k++) {
+        var index = index_a[k];
+        var ditem = _GLOBAL_VAR['ditems'][index];
+        var title = $("titleLink_"+index);
+        var url;
+        if(ditem.type_name == "bookmark" && ditem.hasDetails) {
+            var url = "/toolbar_server_v13";
+            params = "v=13.0&from=site&user="+_GLOBAL_VAR['my_name']+"&cmd=share_makePermalink&json="+Object.toJSON({
+                mode:3,
+                url:encodeURIComponent(ditem.url),
+                "user":_GLOBAL_VAR['username']
+            });
+            new Ajax.Request(url,
+            {
+                asynchronous:false,
+                evalScripts:false,
+                parameters:params,
+                onComplete:function(request){
+                    if(request.status=="200") {
+                        result = request.responseText.evalJSON()["result"];
+                        url = result["url"];
+                    }else {
+                        url = title.href;
+                    }
+                }
+            });
+        }else {
+            if(ditem.share_link && !ditem.share_link.empty()){
+                url = ditem.share_link
+            }else{
+                url = title.href;
+            }
+        }
+        var desc = _GLOBAL_VAR['ditems'][index].description;
+        var t = new Element("a", {
+            href:url,
+            className:"eTitle",
+            "rel":"nofollow"
+        }).update(title.innerHTML);
+        var d = new Element("p").update(desc);
+        var dt = new Element("p");
+        dt.appendChild(t);
+        dt.appendChild(d);
+        content.appendChild(dt);
+        var dd = new Element("div");
+        
+        if(_GLOBAL_VAR["ditems"][index].type_name == "image") {
+            var image_url = _GLOBAL_VAR["ditems"][index].share_link ? _GLOBAL_VAR["ditems"][index].share_link : _GLOBAL_VAR["ditems"][index].url
+            var img_a = new Element("a", {
+                href:image_url,
+                alt:_GLOBAL_VAR["ditems"][index].title
+            })
+            img_a.appendChild(new Element("img",{
+                src:_GLOBAL_VAR["ditems"][index].permanent_url,
+                style:"width:160px"
+            }));
+            dd.appendChild(img_a);
+        }
+        else if(_GLOBAL_VAR["ditems"][index].type_name == "note") {
+            dd.appendChild(new Element("div", {
+                className: "eHContent"
+            }).update(_GLOBAL_VAR["ditems"][index].note_content.replace(/\\"/g,'"')));
+        }
+        else if(_GLOBAL_VAR["ditems"][index].type_name == "bookmark") {
+            var aUL = new Element("ul", {
+                className:"eAUL"
+            });
+            var a = null;
+            var annotations = $("annotations_" + index);
+            if (annotations) {
+                a = annotations.down();
+            }
+            while (a) {
+				
+                var aLI = new Element("li", {
+                    style: "line-height:150%;margin-bottom:.6em;"
+                });
+                var hcontent = "";
+                if(a.hasClassName("imageAnnotation")){
+                    var a_index = a.id.split("_")[2]
+                    hcontent = "<a href='"+_GLOBAL_VAR["ditems"][index].annotations[a_index].share_link+"'><img style='width:160px' src='"+_GLOBAL_VAR["ditems"][index].annotations[a_index].permanent_url+"'/></a>";
+                }else if(a.hasClassName("textAnnotation")){
+                    var h = a.down();
+                    hcontent = h.down().innerHTML;
+                    if (h.next()) {
+                        var sUL = new Element("ul", {
+                            className: "eSUL",
+                            style: "line-height:150%;margin-bottom:.6em;"
+                        });
+                        var s = h.down().next().down().down();
+                        while (s) {
+                            var sLI = new Element("li")
+                            sLI.appendChild(new Element("span", {
+                                className: "eSContent"
+                            }).update(s.down().innerHTML));
+                            var tail = new Element("span", {
+                                className: "eSTail",
+                                style: "font-size:12px;color:#aaa;"
+                            }).update(" - ");
+                            var poster = s.down().next().down().innerHTML;
+                            tail.appendChild(new Element("a", {
+                                href: BOOKMARK_HOST + "/user/" + poster
+                            }).update(poster));
+                            sLI.appendChild(tail);
+                            sUL.appendChild(sLI);
+                            s = s.next();
+                        }
+                        aLI.appendChild(sUL);
+                    }
+                }
+                aLI.appendChild(new Element("div", {
+                    className: "eHContent"
+                }).update(hcontent));
+				
+                aUL.appendChild(aLI);
+                a = a.next();
+            }
+            dd.appendChild(aUL);
+        }
+        
+        content.appendChild(dd);
+    }
+    contentOutter.appendChild(content);
+    return contentOutter;
+}
+function getPermalinkMode() {
+    var a = $('pLinkOpt_1').checked;
+    var b = $('pLinkOpt_2').checked;
+    
+    var mode = 0;
+    if (!a) mode += 2;
+    if (!b) mode += 1;
+    
+    return mode;
+}
+function copyPermanlink(index) {
+    var top = 0;
+    var root = "ditemItem_"+index;
+    //    var root = "leftColumn";
+    //    var p = $("leftColumn").viewportOffset();
+    //    if(p[1]<0) {
+    //        top = 0 - p[1];
+    //    }
+    var pw = new PopWindow({
+        optEnabled: true,
+        top:top+20,
+        width:500,
+        title:"Copy Permalink",
+        center:true,
+        root:root
+
+    });
+    pw.appendNode(loadPermanlinkContent(index, pw));
+    if(BrowserVersion.IE){
+        pw.submitBtn.value = "Copy to clipboard";
+        pw.cancelBtn.hide();
+        pw.submit = function(){
+            _copy($F("pLinkInput"));
+            pw.submitBtn.value = "Copied";
+        }
+    }else{
+        var noticer = $("wOptions");
+//        noticer.innerHTML = "Your browser does not allow access to your computer's clipboard. Instead, please select the URL then use <strong>Ctrl-C</strong> for Copy."
+        noticer.innerHTML = "";
+        noticer.setStyle({
+            "color":"#cc0000",
+            "textAlign":"left"
+        });
+    }
+    makePermalink(index);
+}
+function makePermalink(index){
+    PopWindow.instance.onLoading();
+    _GLOBAL_VAR["ditems"][index].shareMode = getPermalinkMode();
+    var url = "/toolbar_server_v13";
+    params = "v=13.0&from=site&user="+_GLOBAL_VAR['my_name']+"&cmd=share_makePermalink&json="+Object.toJSON({
+        mode:_GLOBAL_VAR["ditems"][index].shareMode,
+        url:encodeURIComponent(_GLOBAL_VAR["ditems"][index].url),
+        "user":_GLOBAL_VAR['username']
+    });
+    new Ajax.Request(url,
+    {
+        asynchronous:true,
+        evalScripts:false,
+        parameters:params,
+        onComplete:function(request){
+            result = request.responseText.evalJSON()["result"];
+            _GLOBAL_VAR["ditems"][index].permaLink = result["url"];
+            $("pLinkInput").value = _GLOBAL_VAR["ditems"][index].permaLink;
+            $("pPreivew").href = _GLOBAL_VAR["ditems"][index].permaLink;
+            PopWindow.instance.noticer.hide();
+            PopWindow.instance.content.show();
+            PopWindow.instance.opt.show();
+            PopWindow.instance.reCalShadowRange();
+        }
+    });
+}
+
+function getShareLink(index){
+    var top = 0;
+    var root = "ditemItem_"+index;
+    var pw = new PopWindow({
+        optEnabled:true,
+        top:top+20,
+        width:500,
+        title:"Share Link",
+        center:true,
+        root:root
+    });
+
+    pw.onLoading();
+    if(!_GLOBAL_VAR['ditems'][index].share_link){
+        new Ajax.Request('/item/get_share_url',
+            {
+                asynchronous: true,
+                evalScripts: false,
+                onComplete: function (request) {
+                    var res = JSON.parse(request.responseText);
+                    _GLOBAL_VAR['ditems'][index].share_link = res.shared_url;
+                    pw.appendNode(loadSharedLink(index));
+                    PopWindow.instance.noticer.hide();
+                    PopWindow.instance.content.show();
+                    PopWindow.instance.reCalShadowRange();
+                },
+                parameters: "link_id=" + encodeURIComponent(_GLOBAL_VAR['ditems'][index].link_id)
+            });
+    }else{
+        pw.appendNode(loadSharedLink(index));
+        PopWindow.instance.noticer.hide();
+        PopWindow.instance.content.show();
+        PopWindow.instance.reCalShadowRange();
+    }
+}
+
+function loadSharedLink(index,pw){
+    var c = new Element("div", {
+        className:"pLinkContent"
+    });
+    var link = new Element('div',{className:'pLink'});
+    link.appendChild(new Element('input',{
+        id:"pLinkInput",
+        className:"inputTxt2",
+        value:_GLOBAL_VAR['ditems'][index].share_link,
+        onclick:"this.select()"
+    }));
+    c.appendChild(link);
+    return c;
+}
+
+
+function loadPermanlinkContent(index, pw) {
+    var c = new Element("div", {
+        className:"pLinkContent"
+    });
+    var tip = new Element("div", {
+        className:"alertTip"
+    }).update("Share this annotated page with others<br/><strong>Copy the URL below</strong> and paste it in your blog, email or IM messages...")
+    c.appendChild(tip);
+    var link = new Element("div", {
+        className:"pLink"
+    });
+    link.appendChild(new Element("a", {
+        id:"pPreivew",
+        target:"_blank"
+    }).update("Preview &raquo;"))
+    link.appendChild(new Element("input", {
+        id:"pLinkInput",
+        className:"inputTxt2",
+        onclick:"this.select()"
+    }));
+    c.appendChild(link);
+    var optLink = new Element("a",{
+        href:"javascript:void(0);"
+    }).update("Options...");
+    optLink.onclick = function(){
+        $("pLinkOpts").toggle();
+    }
+    c.appendChild(optLink);
+    var pLinkOpts = new Element("div", {
+        id:"pLinkOpts"
+    }).hide();
+    var opt_1 = new Element("label").update("<input type='checkbox' autocomplete='off' id='pLinkOpt_1' value='opt1' onclick=\"makePermalink('"+index+"');\" />Only show my highlights and inline comments");
+    var opt_2 = new Element("label").update("<input type='checkbox' autocomplete='off' id='pLinkOpt_2' value='opt2' onclick=\"makePermalink('"+index+"');\" />Don't show my private highlights and inline comments");
+    pLinkOpts.appendChild(opt_1);
+    pLinkOpts.appendChild(opt_2);
+    c.appendChild(pLinkOpts);
+    return c;
+}
+function forwardB(index_a) {
+    forwardItem({
+        'type':'ditem',
+        'index_a':index_a
+    });
+}
+function shareB(index_a) {
+    shareItem({
+        'type':'ditem',
+        'index_a':index_a
+    });
+}
+        
+function includeAnnotations(){
+    var preBox = $("forwardPreview");
+    if(this.checked){
+        preBox.show();
+    }else {
+        preBox.hide();
+    }
+}
+function initContactsSelect() {
+    var select = new Element("select", {
+        id:"sendToSelector"
+    });
+    select.onchange = function(){
+        if(this.value=="some") {
+            $(_GLOBAL_VAR["bACCID"]).show();
+            _GLOBAL_VAR[_GLOBAL_VAR["bACCID"]+"_instance"].showTipInBox();
+        }else {
+            _GLOBAL_VAR[_GLOBAL_VAR["bACCID"]+"_instance"].recBox.reset();
+            $(_GLOBAL_VAR["bACCID"]).hide();
+            _GLOBAL_VAR[_GLOBAL_VAR["bACCID"]+"_instance"].hideTipInBox();
+        }
+    }.bind(select);
+    select.appendChild(new Element("option", {
+        value:"some",
+        "selected":"selected"
+    }).update("My mutual friends or emails"));
+    select.appendChild(new Element("option", {
+        value:"all"
+    }).update("All my mutual friends"));
+    select.appendChild(new Element("option", {
+        value:"myself"
+    }).update("No one. Just a note"));
+    select.setAttribute("autocomplete", "off");
+    if(ACContact.contactListsID.length>0) {
+        select.appendChild(new Element("option", {
+            className:"sep",
+            "disabled":"disabled"
+        }).update("--My Contact Lists--"));
+        ACContact.contactListsID.each(function(cIndex){
+            var list = ACContact.contacts[cIndex];
+            select.appendChild(new Element("option", {
+                value:list.id
+            }).update(list.extra.title));
+        });
+    }
+    var sendTo = $("sendToTD");
+    sendTo.update("");
+    sendTo.appendChild(select);
+    $(_GLOBAL_VAR["bACCID"]).show();
+    _GLOBAL_VAR[_GLOBAL_VAR["bACCID"]+"_instance"].showTipInBox();
+
+}
+function doForward() {
+}
+
+
+function postToDraftForward(bID) {
+    var form = document.forms["forwardForm"];
+    if(!form) {
+        form = new Element("form", {
+            name:"forwardForm",
+            method:"post",
+            action:"/dmail/draft_forward"
+        }).hide();
+        form.appendChild(new Element("input", {
+            type:"hidden",
+            name:"b_id",
+            value:bID
+        }));
+        form.setAttribute("autocomplete", "off");
+        document.body.appendChild(form);
+    }else {
+        form.b_id = bID;
+    }
+    form.submit();
+}
+function copyThis(){
+    var index = arguments[0];
+    var url = encodeURIComponent(_GLOBAL_VAR['ditems'][index].url);
+    var title = encodeURIComponent(_GLOBAL_VAR['ditems'][index].title);
+    var tags = encodeURIComponent(_GLOBAL_VAR['ditems'][index].t_name);
+    var referInfo = encodeURIComponent(self.location);
+    var url="/post/index?url="+url+"&title="+title+"&tags="+tags+"&referInfo="+referInfo;
+    self.location = url;
+}
+function thanks(index){
+    var root = "ditemItem_"+index;
+    //    var root="leftColumn";
+    //    var p = $("leftColumn").viewportOffset();
+    //    var top = 0;
+    //    if(p[1]<0) {
+    //        top = 0 - p[1];
+    //    }
+    var pw = new PopWindow({
+        optEnabled: true,
+        left:120,
+        top:top+20,
+        width:500,
+        title:"Thanks",
+        root:root
+    });
+    var ditem = _GLOBAL_VAR["ditems"][index];
+    var tContent = new Element("div");
+    var to = (!_GLOBAL_VAR["thanksFirstBy"] || ditem.first_by.blank()) ? ditem.u_name : ditem.first_by;
+    var toRealName = (!_GLOBAL_VAR["thanksFirstBy"] || ditem.first_by.blank()) ? ditem.real_name : ditem.first_by_real_name;
+    var subject = "Thanks for sharing "+ditem.title;
+    var content = "<a href='"+BOOKMARK_HOST+"/profile/"+_GLOBAL_VAR['visitor'].username+"'>"+_GLOBAL_VAR['visitor'].real_name+"</a> wishes to thank <a href='"+BOOKMARK_HOST+"/profile/"+to+"'>"+toRealName+"</a> for sharing this link: <a href='"+ditem.url+"'>"+ditem.title+"</a>";
+    var p = new Element("p");
+    p.update("Say \"Thanks\" to "+toRealName+" for this link. &nbsp;&nbsp;");
+    tContent.appendChild(p);
+    var inboxLink = new Element("a").update("Write some message for "+toRealName);
+    inboxLink.href = MESSAGE_HOST+"/inbox/"+to+"?subject="+encodeURIComponent(subject)+"&content="+encodeURIComponent(content);
+    tContent.appendChild(inboxLink);
+    p = new Element("p",{
+        "style":"margin-top: 9px;font-size:8pt;"
+    });
+    var trackChecker = new Element("label").update("<input type='checkbox' id='trackChecker' checked='checked' /> Track conversations about this bookmark?");
+    p.appendChild(trackChecker);
+    tContent.appendChild(p);
+    pw.appendNode(tContent)
+    pw.submitBtn.value = " Ok ";
+    pw.submit = function(index){
+        var url = "/message_mana/send_msg";
+        var json = {};
+        json["send_type"] = "thanks";
+        json["send_to"] = to;
+        json["subject"] = encodeURIComponent(subject);
+        json["message"] = encodeURIComponent(content);
+        json["bid"] = ditem.b_id2;
+        json["track"] = $("trackChecker").checked;
+        json["lid"] = ditem.url_id2;
+        this.onLoading();
+        new Ajax.Request(url,
+        {
+            asynchronous:true,
+            evalScripts:false,
+            onComplete:function(request){
+                PopWindow.instance.onComplete({
+                    status:request.status
+                });
+                $("menu_item_"+index+"_thanks").hide();
+            },
+            parameters:"json="+Object.toJSON(json)
+        });
+        return false;
+    }.bind(pw,index);
+}
+        
+function quickCopy(index_a){
+    var index = index_a[0];
+    var json = {};
+    json["link_id"] = _GLOBAL_VAR['ditems'][index].link_id;
+    json["uid"] = _GLOBAL_VAR['ditems'][index].user_id;
+    json["copy_type"] = "1";
+    showCentralNoticer(DIS_10);
+    new Ajax.Request("/ditem_mana2/quick_copy",
+    {
+        asynchronous:true,
+        evalScripts:false,
+        onComplete:function(request){
+            hideCentralNoticer();
+            if(request.status=="200"){
+                var quickSaveMenu = $("menu_item_"+index+"_qcopy");
+                if(quickSaveMenu) {
+                    quickSaveMenu.hide();
+                }
+                var saveMenu = $("menu_item_"+index+"_save");
+                if(saveMenu) {
+                    saveMenu.onclick = null;
+                    saveMenu.update("Saved");
+                }
+            }
+        },
+        parameters:"json="+Object.toJSON(json)
+    });
+    return false;
+}
+function loadQuickSave(index_a) {
+    var l = new Element("label").update("<input type='checkbox' id='quickCopyH' checked='checked' autocomplete='off' /> Include Highlights.")
+    return l;
+}
+            
+/*===========================================
+ * Save Item
+ * args:
+ *   index - item index
+ *   type - 'ditem', 'list'
+ *   saveType - 'create', 'edit'
+ *   
+ *===========================================*/
+function saveItem(args) {
+    var pw;
+    _GLOBAL_VAR["saveBType"] = args.saveType;
+    var index = args.index || 0;
+    var ditem = _GLOBAL_VAR["ditems"][index];
+    var winTitle = (_GLOBAL_VAR["saveBType"]=='create' ? "Save " : "Edit ") + ditem.type_name;
+	
+    pw = new PopWindow({
+        optEnabled: true,
+        center:true,
+        top: 0,
+        width: 500,
+        title: winTitle,
+//        root: Element.up(this)
+        root:this
+    });
+	
+    pw.appendNode(createSaveItemTemp(ditem));
+    pw.cancel = function(){
+        resetMoreAction();
+        resetAllChecker();
+    }
+    pw.submitBtn.value = "Save";
+    pw.cancelBtn.value = "Cancel";
+    pw.submit = submitSaveItem.bind(this, args);
+    initSaveItemEditor(args);
+
+    if(window.jQuery && !!window.jQuery.fn.DiigoLSearch){
+        jQuery('#bTxtTags').DiigoLSearch({
+            mutil:true,
+            type:null,
+            data:TAGs
+        });
+    }else{
+        enabledSaveItemTagSuggestion("bTxtTags");
+    }
+
+    switchSelectAddToList(ditem);
+    switchSelectAddToGroup(null,ditem.index);
+}
+        
+function createSaveItemTemp(ditem) {   
+    var table = new Element("table", {
+        className: "editBTable"
+    });
+    var tbody = new Element("tbody");
+    // url row
+    var url_row = new Element("tr");
+    url_row.appendChild(new Element("td").update("<input type='text' placeholder='Url' id='bTxtUrl' class='inputTxt2' name='url' style='width:430px;' maxlength='255' />"));
+    
+    // title row
+    var title_row = new Element("tr");
+//    title_row.appendChild(new Element("th").update("Title:"));
+    title_row.appendChild(new Element("td").update("<input type='text' placeholder='Title' id='bTxtTitle' class='inputTxt2' name='title' style='width:430px;' maxlength='255' />"));
+    
+    // desc row
+    desc_row = new Element("tr");
+//    desc_row.appendChild(new Element("th").update("Description:"));
+    desc_row.appendChild(new Element("td").update("<textarea id='bTxtDesc' placeholder='Add a description' class='inputTxt2' name='desc' style='width:430px;height:60px;' ></textarea>"));
+    
+    // tags row
+    var tag_row = new Element("tr");
+//    tag_row.appendChild(new Element("th").update("Tags:"));
+    tag_row.appendChild(new Element("td").update("<input type='text' class='inputTxt2' placeholder='Add Tags' id='bTxtTags' autocomplete='off' name='tags' style='width:430px;' maxlength='255' /><p style='font-size:12px;color:#999;'>space separated. Use \" \" for tag with multiple words.</p>"));
+    
+    // add to list
+    var list_row = new Element("tr");
+//    list_row.appendChild(new Element("th"));
+    var list_td = new Element("td").update("");
+    list_td.appendChild(new Element("div", {
+        className: "addToHolder",
+        id:"addToListHolder"
+    }).hide());
+    list_td.appendChild(new Element("div", {
+        className: "addListInput",
+        id:"addListInputHolder"
+    }).hide());
+    list_row.appendChild(list_td);
+	
+    var group_row = new Element("tr");
+	group_row.id = 'group_selector';
+//    group_row.appendChild(new Element("th"));
+    var group_td = new Element("td").update("");
+    group_td.appendChild(new Element("div", {
+        className: "addToHolder",
+        id:"addToGroupHolder"
+    }).hide());
+    group_row.appendChild(group_td);
+	
+    var options_row = new Element("tr");
+//    options_row.appendChild(new Element("th"));
+	
+    var privacy_elem = "<label><input id='bPriPrivate' type='checkbox' /><b class='PrivateIcon'></b>Private</label>";
+    var unread_elem = "<label><input type='checkbox' id='bUnread' /><b class='RLIcon'></b>Read Later</label>";
+    var copy_ann_elem = "<label style='float:right;margin-right:0;'><input id='bCopyAnnotations' type='checkbox' />Copy these highlights</label>";
+	
+    tbody.appendChild(title_row);
+    if(ditem.type_name == "bookmark"){
+    	tbody.appendChild(url_row);
+        var options = privacy_elem + unread_elem;
+        if(ditem.u_name!=_GLOBAL_VAR["my_name"] && ditem.hasDetails){
+            options = copy_ann_elem + options;
+        }
+        options_row.appendChild(new Element("td").update(options));
+        tbody.appendChild(options_row);
+        tbody.appendChild(desc_row);
+    }else if(ditem.type_name == "image"){
+        options_row.appendChild(new Element("td").update(privacy_elem));
+        tbody.appendChild(options_row);
+        tbody.appendChild(desc_row);
+    }else if(ditem.type_name == "note"){
+        options_row.appendChild(new Element("td").update(privacy_elem));
+        tbody.appendChild(options_row);
+        // content row
+        var content_row = new Element("tr");
+        content_row.appendChild(new Element("th").update("Content:"));
+        content_row.appendChild(new Element("td").update("<textarea id='bNoteTxtContent' class='inputTxt2' name='content' style='width:380px;height:200px;' ></textarea>"));
+        tbody.appendChild(content_row);
+    }else if(ditem.type_name == 'pdf'){
+		var options = privacy_elem + unread_elem;
+		options_row.appendChild(new Element("td").update(options)).hide();
+        tbody.appendChild(options_row);
+        tbody.appendChild(desc_row);
+	}
+    tbody.appendChild(tag_row);
+    tbody.appendChild(list_row);
+    tbody.appendChild(group_row);
+	
+    table.appendChild(tbody);
+    return table;
+}
+function switchSelectAddToList(ditem) {
+    var h = $("addToListHolder");
+    if(!_GLOBAL_VAR["my_lists"]) {
+        // load my lists
+        var url = '/ditem_outliner/load_user_outliners?u_name='+_GLOBAL_VAR['my_name'];
+        h.update("<img src='/images/loading.gif' alt='loading...' />").show();
+        new Ajax.Request(url,
+        {
+            asynchronous:true,
+            evalScripts:false,
+            onComplete:function(request){
+                if(request.status=="200") {
+                    _GLOBAL_VAR["my_lists"] = request.responseText.evalJSON();
+                    renderListSelecotr(h,ditem);
+                }
+            }
+        });
+        return false;
+    }else {
+//        !$("bAddToList").checked ? h.hide() : h.show();
+        h.show();
+        if (!$("addToListSelector")) {
+            renderListSelecotr(h,ditem);
+        }
+    }
+} 
+function renderListSelecotr(h,ditem) {
+    var s = new Element("select", {
+        id:"addToListSelector",
+        className:"inputTxt2"
+    });
+    s.onchange = function(){
+        if(s.value=="-2"){
+            var addListInput = $("addListInputHolder");
+            addListInput.update('<input type="text" id="newListInEdit" class="inputTxt2"><a id="AddListInEdit">Add</a><a id="CancelAddInEdit">Cancel</a>');
+            addListInput.show();
+            $("addToListSelector").hide();
+            $("AddListInEdit").onclick = function(){
+                var title = $("newListInEdit").value;
+                if(title.length>0){
+                    createListByShareContextMenu($H({
+                        title:title
+                    }));
+                }
+            };
+            $("CancelAddInEdit").onclick = function(){
+                addListInput.hide();
+                $("addToListSelector").show();
+            }
+
+        }
+    }.bind(s);
+    s.appendChild(new Element("option", {
+        "value":-1
+    }).update("Add to an Outliner"));
+    s.appendChild(new Element("option", {
+        "value":-1
+    }).update("------------"));
+    s.appendChild(new Element("option", {
+        "value":-2
+    }).update("Create an Outliner..."));
+    s.appendChild(new Element("option", {
+        "value": -1
+    }).update("------------"));
+
+    for(var i=0; i<_GLOBAL_VAR["my_lists"].length; i++) {
+        if(ditem.lists_id.indexOf(_GLOBAL_VAR["my_lists"][i].id)>-1){
+            var tiny = " (added)";
+        }else{
+            var tiny = "";
+        }
+        var o = new Element("option", {
+            "value":i
+        }).update(_GLOBAL_VAR["my_lists"][i].title+tiny);
+        s.appendChild(o);
+    }
+
+
+    h.update("").appendChild(s);
+    s.value = -1;
+}
+            
+function switchSelectShareToFriend(friendChecker){
+    var h = $("shareToFriendHolder");
+    /*--------------------------------
+     * init contacts
+     *--------------------------------*/
+    if(!_GLOBAL_VAR["contactLists"]){
+        var url = "/user_mana2/load_contact_lists";
+        h.update("<img src='/images/loading.gif' alt='loading...' />").show();
+        new Ajax.Request(url,
+        {
+            asynchronous:true,
+            evalScripts:false,
+            method:'get',
+            onComplete:function(request){
+                if(request.status=="200") {
+                    var contacts = request.responseText.evalJSON();
+                    _GLOBAL_VAR["contactLists"] = contacts;
+                    renderShareToFriendSelector(h);
+                }
+            }
+        });
+        return false;
+    }else {
+        h.visible() ? h.hide() : h.show();
+        if (!$("shareToFriendSelector")) {
+            renderShareToFriendSelector(h);
+        }
+    }
+}
+                    
+function renderShareToFriendSelector(h) {		
+    var s = new Element("select", {
+        id:"shareToFriendSelector"
+    });
+    s.onchange = function(){
+        if(s.value=="-2"){
+            self.location=BOOKMARK_HOST+"/contact/new_list"
+        }
+    }.bind(s);
+    //s.appendChild(new Element("option", {"value":-1}).update("------------"));
+    s.appendChild(new Element("option", {
+        "value":"-3",
+        "selected":"selected"
+    }).update("All Friends"));
+    var og = new Element("optgroup", {
+        "label":"Or Friends in a Contact List"
+    });
+    for(var i=0; i<_GLOBAL_VAR["contactLists"].length; i++) {
+        var cl = _GLOBAL_VAR["contactLists"][i];
+        var o = new Element("option", {
+            "value":cl.id
+        }).update(cl.extra.title);
+        og.appendChild(o);
+    }
+    s.appendChild(og);
+    if(_GLOBAL_VAR["contactLists"].length>1) {
+        s.appendChild(new Element("option", {
+            "value":-1
+        }).update("------------"));
+    }
+    s.appendChild(new Element("option", {
+        "value":-2
+    }).update("Create a Contact List..."));
+    h.update("").appendChild(s);
+    s.value = -3;
+}
+                    
+function switchSelectAddToGroup(groupChecker,ditem_index){
+    var h = $("addToGroupHolder");
+    if(!_GLOBAL_VAR["my_groups"]) {
+        // load my groups
+        var url = '/group_mana/load_groups?u_name='+_GLOBAL_VAR['my_name'];
+        h.update("<img src='/images/loading.gif' alt='loading...' />").show();
+        new Ajax.Request(url,
+        {
+            asynchronous:true,
+            evalScripts:false,
+            onComplete:function(request){
+                if(request.status=="200") {
+                    _GLOBAL_VAR["my_groups"] = request.responseText.evalJSON();
+                    renderGroupSelector(h,ditem_index);
+
+                }
+            }
+        });
+        return false;
+    }else {
+//        !$("bAddToGroup").checked ? h.hide() : h.show();
+        h.show()
+        if (!$("addToGroupSelector")) {
+            renderGroupSelector(h,ditem_index);
+        }
+    }
+}
+function renderGroupSelector(h,ditem_index) {
+    var s = new Element("select", {
+        id:"addToGroupSelector",
+        className: "inputTxt2"
+    });
+    s.onchange = function(){
+        if(s.value=="-2"){
+            self.location=GROUP_HOST+"/create"
+        }else if(s.value>=0){
+            if($("addToGroupHolder").select('label')[0]){
+                $("addToGroupHolder").select('label')[0].show();
+            }
+            $("addToGroupHolder").select('textarea')[0].show();
+        }else if(s.value == -1){
+            if($("addToGroupHolder").select('label')[0]){
+                $("addToGroupHolder").select('label')[0].hide();
+            }
+            $("addToGroupHolder").select('textarea')[0].hide();
+        }
+    }.bind(s);
+    s.appendChild(new Element("option", {
+        "value":-1
+    }).update("Share to a Group"));
+    s.appendChild(new Element("option", {
+        "value":-1
+    }).update("------------"));
+
+    var in_groups = _GLOBAL_VAR['ditems'][ditem_index]['groups'];
+    var in_group_tmp = [];
+    for(var i= 0,len = in_groups.length;i<len;i++){
+        in_group_tmp.push(in_groups[i].g_name);
+    }
+
+
+    for(var i=0; i<_GLOBAL_VAR["my_groups"].length; i++) {
+        if(in_group_tmp.indexOf(_GLOBAL_VAR["my_groups"][i].g_name)>-1){
+            var tiny = " (added)";
+        }else{
+            var tiny = "";
+        }
+        var o = new Element("option", {
+            "value":i
+        }).update(_GLOBAL_VAR["my_groups"][i].display_name+tiny);
+        s.appendChild(o);
+    }
+    if(_GLOBAL_VAR["my_groups"].length>1) {
+        s.appendChild(new Element("option", {
+            "value":-1
+        }).update("------------"));
+    }
+    s.appendChild(new Element("option", {
+        "value":-2
+    }).update("Create a Group..."));
+    h.update("").appendChild(s);
+	
+    var ditem = _GLOBAL_VAR["ditems"][ditem_index];
+    if ((ditem.type_name == "bookmark" || ditem.type_name == 'pdf') && ditem.hasDetails) {
+        var l = new Element("label", {
+            "style": "margin-left:10px;display:none;"
+        }).update("<input type='checkbox' checked ='checked' id='addToGroupWithA'/>Share Existing Annotations");
+        l.setAttribute("for", "addToGroupWithA");
+        h.appendChild(l);
+    }
+                            
+    var t = new Element("textarea", {
+        "id":"addToGroupComment",
+        className : "inputTxt2"
+    });
+    t.setStyle({
+        "margin":"5px 0 0 0",
+        "width":"95%",
+        "height":"60px",
+        "color":"#999",
+        "display":"none"
+    })
+    t.value = _GLOBAL_VAR["pgHint"];
+    t.onfocus = function(){
+        if(t.value==_GLOBAL_VAR["pgHint"]){
+            t.value="";
+            t.style.color="#000;"
+        }
+    }.bind(t);
+    t.onblur = function(){
+        if(t.value.blank()){
+            t.value=_GLOBAL_VAR["pgHint"];
+            t.style.color="#999;"
+        }
+    }.bind(t);
+
+    if(ditem.description){
+        t.value = ditem.description;
+    }
+
+    h.appendChild(t);
+                            
+    s.value = -1;
+}
+                        
+function initSaveItemEditor(args) {
+    var title;
+    var url;
+    var tags;
+    var desc;
+    var mode;
+    var readed;
+    var trace_id;
+    var content;
+    var index = args.index || 0;
+    if(args.type=='list') {
+        title = _GLOBAL_VAR['list'].title;
+        tags = _GLOBAL_VAR['list'].tags.split(",");
+        desc = _GLOBAL_VAR['list'].desc || "";
+    }else{//ditem
+        var ditem = _GLOBAL_VAR['ditems'][index];
+        title = ditem.title;
+        url = ditem.url;
+        tags = ditem.t_name.split(",");
+        desc = ditem.description || "";
+		
+        if(ditem.type_name == "bookmark"){
+            if(ditem.readed==0) {
+                $("bUnread").checked = true;
+            }
+            $("bTxtUrl").value = url;
+        }else if(ditem.type_name == "image"){
+			
+        }else if(ditem.type_name == "note"){
+            $("bNoteTxtContent").up().up().remove();
+            var edit_a_elem = new Element("a");
+            edit_a_elem.href = "/item/edit/note" + ditem.url_key;
+            edit_a_elem.setStyle("text-align: right; display: block; margin-right: 50px;");
+            edit_a_elem.update("Edit Content &raquo");
+            $("wContent").insert({
+                top:edit_a_elem
+            });
+        }else if(ditem.type_name == 'pdf'){
+//			$('group_selector').remove();
+			if(ditem.readed==0) {
+                $("bUnread").checked = true;
+            }
+		}
+		
+        if(ditem.mode==2) {
+            $("bPriPrivate").checked = true;
+        }		
+    }
+                        
+    $("bTxtTitle").value = title;
+	
+    var t_t = [];
+    for(var i=0; i<tags.length; i++) {
+        tags[i].indexOf(" ")!=-1 ? t_t.push("\""+tags[i]+"\"") : t_t.push(tags[i])
+    }
+    var t_name = t_t.join(" ");
+    if($("bTxtTags")){
+        $("bTxtTags").value = t_name.trim();
+    }
+	
+    if($("bTxtDesc")){
+        $("bTxtDesc").value = desc.trim();
+    }
+}
+                    
+function refreshDitem(index) {
+    var b = _GLOBAL_VAR['ditems'][index];
+	
+    var titleEl = $("titleLink_"+index);
+    titleEl.update(_GLOBAL_VAR['ditems'][index].title);
+    titleEl.href = b['url'];
+    
+    var domain = $("oriUrl_"+index);
+    if(domain){
+        domain.update(_GLOBAL_VAR['ditems'][index].domain);
+        domain.href = "/search?adSScope=my&snapshot=no&what=%40" + encodeURIComponent(_GLOBAL_VAR['ditems'][index].domain);
+    }
+    
+    var cacheEl = $("cacheLink_"+index);
+    if(cacheEl){
+        cacheEl.href = b['cache_link'];
+    }
+    var tagsEl = $("tags_"+index);
+    tagsEl.update("");
+    if(_GLOBAL_VAR['ditems'][index].t_name.blank()){
+        tagsEl.className = "";
+    }else {
+        var tags = _GLOBAL_VAR['ditems'][index].t_name.split(",");
+        //tagsEl.className = "tagspan";
+        for(var i=0; i<tags.length; i++) {
+            var a = document.createElement("a");
+            if(tags[i].indexOf(" ")!=-1) {
+                a.href="/user/"+_GLOBAL_VAR['username']+"/"+encodeURIComponent("\""+tags[i]+"\"");
+            }else {
+                a.href="/user/"+_GLOBAL_VAR['username']+"/"+encodeURIComponent(tags[i]);
+            }
+            a.innerHTML = tags[i];
+            tagsEl.appendChild(a);
+        }
+    }
+
+    // mark mode
+    var title;
+    if($("title_"+index)){
+        title = $("title_"+index).up();
+    }else{
+        title = titleEl;  //in image grid view.
+    }
+    if(!title){
+        title = $("titleLink_"+index); //in image grid view.
+    }
+    if(title) {
+        if(b.mode==0) {
+            title.removeClassName("private");
+        }else {
+            title.addClassName("private");
+        }
+    }	
+    
+    if ($("descContent_" + index)) {
+        var desc = _GLOBAL_VAR['ditems'][index].description;
+        if (!desc.blank()) {
+            $("descContent_" + index).update(displayCContent(desc));
+            $("desc_" + index).show();
+            $("expandInfo_"+index).show();
+            if(!$("expandInfo_"+index).hasClassName('expand')){
+                $("expandInfo_"+index).click();
+            }
+        }
+        else {
+            $("desc_" + index).hide();
+        }
+    }
+	
+    switch(_GLOBAL_VAR['ditems'][index].type_name){
+        case "bookmark":
+            //read
+            if (b.readed == 1) {
+                titleEl.className = 'readed';
+                titleEl.title = "";
+                titleEl.href = _GLOBAL_VAR['ditems'][index].url;
+            }else {
+                titleEl.className = 'unread';
+                titleEl.title = "Unread";
+                titleEl.onmouseup = function(){
+                    clickMarkRead(index);
+                };
+                titleEl.href = "/ditem_mana2/read_ditem?link_id=" + _GLOBAL_VAR['ditems'][index].link_id + "&url=" + encodeURIComponent(_GLOBAL_VAR['ditems'][index].url);
+            }
+            break;
+        case "note":
+            break
+    }
+    
+    // refresh lists
+    renderBelongTo(index);
+    // refresh groups
+    renderSharedTo(index);
+    
+}
+
+function submitSaveItem(args) {
+    var index = args.index;
+    var ditem = _GLOBAL_VAR['ditems'][index] || {};
+	ditem.type_name = ditem.type_name || 'bookmark';
+    var params = {};
+	
+    var titleTxt = $("bTxtTitle");
+    if(titleTxt.value.trim()=="") {
+        titleTxt.focus();
+        return false;
+    }
+    params.title = titleTxt.value;
+	
+    var tagsTxt = $("bTxtTags");
+    params.tags = tagsTxt.value.trim();
+	
+    if(descTxt = $("bTxtDesc")){
+        params.description = descTxt.value;
+    }
+	
+    if($("bUnread")){
+        params.unread = $("bUnread").checked;
+    }
+    if($("bPriPrivate")){
+        params["private"] = $("bPriPrivate").checked;
+    }
+
+    if(args.type=='ditem') {
+        params.url = ditem.url;
+        if(ditem.type_name == 'bookmark'){
+        	var urlTxt = $("bTxtUrl");
+		    if(urlTxt.value.trim()=="") {
+		        urlTxt.focus();
+		        return false;
+		    }
+		    if(urlTxt.value != ditem.url){
+		    	params.new_url = urlTxt.value;	
+		    }
+        } 
+	    
+        params.link_id = ditem.link_id;
+		
+        if($("bNoteTxtContent")){
+            var bNoteTxtContent = $("bNoteTxtContent");
+            var content = bNoteTxtContent.value;
+            if(content.empty()){
+                return false;
+            }
+            params.content = content;
+        }
+		
+        if($("bCopyAnnotations") && $("bCopyAnnotations").checked){
+            params.copy_annotations = $("bCopyAnnotations").checked;            
+        }
+        if(_GLOBAL_VAR["my_name"] != ditem.u_name) {
+            params.ca_owner_id = ditem.user_id;
+        }
+    } else if(args.type=='list') {
+        params.url = _GLOBAL_VAR['list'].publish_url;
+    }
+    
+//    if($("bAddToList").checked) {
+        var l = _GLOBAL_VAR['my_lists'][$F("addToListSelector")];
+        if(l) {
+            params.lists = [l.id];
+        }
+//    }
+	
+//    if($("bAddToGroup") && $("bAddToGroup").checked) {
+        var g = _GLOBAL_VAR['my_groups'][$F("addToGroupSelector")];
+        if(g) {
+            params.groups = [g.g_name];
+        }
+//    }
+    var wa = $("addToGroupWithA");
+    if(wa && wa.checked){
+        params.shareExistingAnnotations = true;
+    }
+    var gp = $("addToGroupComment");
+    if(gp && !gp.value.blank() && gp.value!=_GLOBAL_VAR["pgHint"]) {
+        params.groupPageComment = gp.value;
+    }
+
+    PopWindow.instance.onLoading();
+    var url = '/item/save/' + ditem.type_name;
+    new Ajax.Request(url,{
+        asynchronous:true,
+        evalScripts:false,
+        onComplete:function(request){
+            PopWindow.instance.onComplete({
+                status:request.status
+            });
+            if(request.status=="200") {
+                var r = request.responseText.evalJSON();
+                if(args.type=='ditem') {
+                    if(_GLOBAL_VAR["my_name"]==ditem.u_name){
+                        ditem.title = r["title"];
+                        ditem.t_name = r["tags"];
+                        if(r['url'] != null){
+                        	ditem.url = r['url'];                        	
+                        }
+                        
+                        if(r['domain'] != null){
+                        	ditem.domain = r['domain'];
+                        }
+                        
+                        if(r['link_id'] != null){
+                        	ditem.link_id = r['link_id']
+                        }
+                        
+                        if(r["desc"] != null){
+                            ditem.description = r["desc"];
+                        }
+                        if(r["lists_id"]) {
+                            ditem.lists_id = ditem.lists_id.concat(r["lists_id"]).uniq();
+                        }
+                        if(r["groups"] && r["groups"][0]) {
+                            var g = r["groups"][0];
+                            ditem.groups = ditem.groups.concat({
+                                g_name:g.name,
+                                display_name:g.displayName
+                            });
+                        }
+						
+                        ditem.mode = r["mode"];
+                        ditem.readed = r["unread"] ? 0 : 1;
+                        if(r["note_content"] && !r["note_content"].empty()){
+                            ditem.note_content = r["note_content"];
+                        }
+                        if(r["share_link"]){
+                            ditem.share_link = r["share_link"];
+                        }else if(ditem.share_link){
+                            ditem.share_link = "";
+                        }
+                        
+                        if(r['cache_link'] != null){
+                        	ditem.cache_link = r['cache_link'];
+                        }
+                        
+                        _GLOBAL_VAR['ditems'][index] = ditem;
+                        if(args.callback){
+                            args.callback(args.saveType,ditem);
+                        }else{
+                            refreshDitem(index);
+                        }
+                    }
+                }
+            }
+        },
+        parameters: params
+    }
+    );
+    return false;
+}
+
+/*==================================
+ * initialize stuff
+ *==================================*/
+function initSharedTo() {
+    var link_id = "";
+    for(var i=0; i<_GLOBAL_VAR['ditems'].length; i++) {
+        link_id += _GLOBAL_VAR['ditems'][i].index+":"+_GLOBAL_VAR['ditems'][i].link_id+",";
+    }
+    var username = _GLOBAL_VAR['username'] || "";
+    var url = "/group_mana/load_shared_to?u_name="+username;
+    new Ajax.Request(url,
+    {
+        asynchronous:true,
+        evalScripts:false,
+        method:'post',
+        onComplete:function(request){
+            initSharedToComplete(request)
+        },
+        parameters:"link_id="+link_id
+    }
+    );
+}
+function initSharedToComplete(request) {
+    if(request.status=="200") {
+        eval(request.responseText);
+        for(var i=0; i<_GLOBAL_VAR['ditems'].length; i++) {
+            renderSharedTo(i);
+        }
+    }
+}
+/*=====================================
+ * batch actions
+ *=====================================*/
+function doShareToGroupAction() {
+    if(arguments.length<1)
+        var cmd = this.value;
+    else
+        var cmd = arguments[0];
+    switch(cmd) {
+        case '-1':{
+            }
+            break;
+        case '-2':{
+            self.location = GROUP_HOST+"/group_mana/step_1";
+        }
+        break;
+        default:{
+            doShareToGroup(cmd);
+        }
+    }
+}
+function doShareToGroup(cmd) {
+    if(_GLOBAL_VAR['checkedItemCount']==0) {
+        flashNotice2(ALE_20);
+        resetShareToGroup();
+        return false;
+    }
+    lockShareToGroup();
+    var checkedBA = whichBChecked();
+    var link_id = ""
+    for(var i=0; i<checkedBA.length; i++) {
+        if(i==0){
+            link_id += checkedBA[i].index+":"+checkedBA[i].link_id;
+        }else{
+            link_id += ","+checkedBA[i].index+":"+checkedBA[i].link_id;
+        }
+    }
+    var g_name = _GLOBAL_VAR["groups"][cmd].g_name;
+    var url = "/group_mana/share_to?g_name="+g_name;
+    showCentralNoticer(DIS_10);
+    new Ajax.Request(url,
+    {
+        asynchronous:true,
+        evalScripts:false,
+        onComplete:function(request){
+            doShareToGroupComplete(request, cmd)
+        },
+        parameters:"link_id="+link_id
+    }
+    );
+}
+function doShareToGroupComplete(request, g_index) {
+    if(request.status=="200") {
+        flashNotice2(ALE_37.replace("?", "<a href='"+GROUP_HOST+"/group/"+_GLOBAL_VAR['groups'][g_index].g_name+"' style='text-decoration:underline;'>"+_GLOBAL_VAR['groups'][g_index].display_name+"</a>"));
+        var checkedBA = whichBChecked();
+        for(var i=0; i<checkedBA.length; i++) {
+            noticeSharedTo(checkedBA[i].index, "1", g_index);
+        }
+    }else if(request.status=="400") {
+    }else {
+        alert(EXC_1);
+    }
+    resetAllChecker();
+    hideCentralNoticer();
+    resetShareToGroup();
+}
+function noticeSharedTo(b_index, status, g_index) {
+    var g_name = _GLOBAL_VAR['groups'][g_index].g_name;
+    var display_name = _GLOBAL_VAR['groups'][g_index].display_name;
+    var mode = _GLOBAL_VAR['groups'][g_index].mode;
+    if(status=="1") {
+        _GLOBAL_VAR['ditems'][b_index].groups.push({
+            "g_name":g_name,
+            "display_name":display_name,
+            "mode":mode
+        });
+        renderSharedTo(b_index);
+    }else if(status=="2") {
+    }else {
+}
+}
+function renderSharedTo(index) {
+    if(_GLOBAL_VAR['ditems'][index].groups.length>0) {
+        var sharedTo = $("sharedTo_"+index);
+        if(sharedTo){
+            sharedTo.show();
+            sharedTo.innerHTML = "in group: ";
+            for(var i=0; i<_GLOBAL_VAR['ditems'][index].groups.length; i++) {
+                var group = _GLOBAL_VAR['ditems'][index].groups[i];
+                var a = document.createElement("a");
+                a.href = GROUP_HOST+"/group/"+group.g_name;
+                a.innerHTML = group.display_name;
+                a.style.margin = "0";
+                sharedTo.appendChild(a);
+                if(i<_GLOBAL_VAR['ditems'][index].groups.length-1) {
+                    sharedTo.innerHTML += ", ";
+                }
+            }
+        }
+    }
+}
+function resetShareToGroup() {
+    for(var i=0; i<_shareToGroupSelectCount; i++) {
+        var action = $("shareToGroup_"+i);
+        if(action){
+            action.value = "-1";
+            action.disabled = false;
+            action.blur();
+        }
+    }
+}
+function lockShareToGroup() {
+    for(var i=0; i<_shareToGroupSelectCount; i++) {
+        var action = $("shareToGroup_"+i);
+        if(action){
+            action.disabled = true;
+        }
+    }
+}
+
+
+function flagAsSpam() {
+    if(!confirm("report spam?")) {
+        return false;
+    }
+    var index = arguments[0];
+    var b_id2 = _GLOBAL_VAR['ditems'][index].b_id2;
+    var url = "/spam_mana/mark_spam?b_id2="+b_id2;
+    new Ajax.Request(url,
+    {
+        asynchronous:true,
+        evalScripts:false,
+        onComplete:function(request){
+            if(request.status=="200") {
+                var flag = $("menu_item_"+index+"_spam");
+                flag.innerHTML = "Spam reported";
+                flag.onclick = null;
+            }else {
+                alert(request.status);
+            }
+        }
+    });
+    return false;
+}
+
+function traceDitem() {
+    doTraceDitem([_GLOBAL_VAR['ditems'][arguments[0]]], 1);
+}
+function untraceDitem() {
+    doTraceDitem([_GLOBAL_VAR['ditems'][arguments[0]]], 0);
+}
+function doTraceDitem(bA, trace) {
+    if(bA.length==0) return false;
+    var params = [];
+    for(var i=0; i<bA.length; i++) {
+        params.push($H({
+            b_index:bA[i].index,
+            url_id2:bA[i].url_id2,
+            trace_id:bA[i].trace_id,
+            trace:trace
+        }));
+    }
+    var url = "/alert/trace_ditem";
+    showCentralNoticer(DIS_10);
+    new Ajax.Request(url,
+    {
+        asynchronous:true,
+        evalScripts:true,
+        onComplete:function(request){
+            traceDitemComplete(request, bA, trace)
+        },
+        parameters:"trace="+trace+"&trace_info_json="+params.toJSON()
+    }
+    );
+    return false;
+}
+
+function traceDitemComplete(request, bA, trace) {
+    hideCentralNoticer();
+    if(request.status=="200") {
+        var trace_info = request.responseText.evalJSON();
+        for(var i=0; i<trace_info.length; i++) {
+            var index = trace_info[i].b_index;
+            var menuItem = $("menu_item_"+index+"_trace");
+            var b = _GLOBAL_VAR['ditems'][index];
+            if(trace==1) {
+                if(menuItem) {
+                    menuItem.onclick = untraceDitem.bind(menuItem, index);
+                    menuItem.innerHTML = WORD_27;
+                }
+                b.trace_id = trace_info[i].trace_id;
+            }else {
+                if(menuItem) {
+                    menuItem.onclick = traceDitem.bind(menuItem, index);
+                    menuItem.innerHTML = WORD_26;
+                }
+                b.trace_id = 0;
+            }
+            var tMark = $("bTrace_"+index);
+            if(b.trace_id>0) {
+                tMark.innerHTML = WORD_28;
+                tMark.show();
+            }else {
+                tMark.innerHTML = "";
+                tMark.hide();
+            }
+        }
+    }else {
+        alert(EXC_5);
+    }
+    resetMoreAction();
+}
+function switchTagCloudEOS() {
+    var cusData = loadCusData();
+    var switcher = $("tagCloudEOS");
+    var tagCloudHolder = $("u_cloudBoxHolder");
+    if(switcher.innerHTML.indexOf("Expand")!=-1) {
+        tagCloudHolder.setStyle({
+            height: 'auto',
+            overflow: 'hidden'
+        });
+        cusData['tag_cloud_eos'] = "1";
+        switcher.innerHTML = "Shrink";
+    }else {
+        tagCloudHolder.setStyle({
+            height: '300px',
+            overflow: 'auto'
+        });
+        cusData['tag_cloud_eos'] = "0";
+        switcher.innerHTML = "Expand";
+    }
+    cusData.store();
+}
+
+function removeBFromList2() {
+    if(confirm(ALE_33)) {
+        var listID = this.getAttribute("listID");
+        doRemoveBFromList([_GLOBAL_VAR['ditems'][arguments[0]]], 1, listID);
+    }else {
+        resetMoreAction();
+        resetAllChecker();
+        return false;
+    }
+}
+function removeBFromList() {
+    if(confirm(ALE_33)) {
+        doRemoveBFromList([_GLOBAL_VAR['ditems'][arguments[0]]], 0);
+    }else {
+        resetMoreAction();
+        resetAllChecker();
+        return false;
+    }
+}
+function doRemoveBFromList(bA, deleteType, listID) {
+    var lIDA = [];
+    for(var i=0; i<bA.length; i++) {
+        lIDA.push(bA[i].itemId || bA[i].link_id);
+    }
+    var itemType = bA[0].itemType || 2;
+    var url = '/ditem_list/delete_ditem';
+    var list_id;
+    if(deleteType=='1') {
+        list_id = listID;
+    }else {
+        list_id = _GLOBAL_VAR['list_id'];
+    }
+    var jsonInfos = $H({
+        lid_a:lIDA,
+        list_id:list_id,
+        item_type:itemType
+    }).toJSON();
+    showCentralNoticer(DIS_10);
+    new Ajax.Request(url,
+    {
+        asynchronous:true,
+        evalScripts:true,
+        onComplete:function(request){
+            doRemoveBFromListComplete(request, bA, deleteType, list_id)
+        },
+        parameters:"json_infos="+jsonInfos
+    }
+    );
+    return false;
+}
+
+function doRemoveBFromListComplete(request, bA, deleteType, list_id) {
+    hideCentralNoticer();
+    resetMoreAction();
+    resetAllChecker();
+    if(request.status=="200") {
+        if(deleteType=='1') {
+            for(var i=0; i<bA.length; i++) {
+                var b = bA[i];
+                _GLOBAL_VAR['ditems'][b.index].lists_id = _GLOBAL_VAR['ditems'][b.index].lists_id.without(list_id);
+                $("bToList_"+b.index+"_"+list_id).remove();
+            }
+        }else {
+            for(var i=0; i<bA.length; i++) {
+                var b = bA[i];
+                _GLOBAL_VAR['ditems'][b.index] = null;
+                removeListDitem(b.index);
+            }
+            if(_GLOBAL_VAR['ditems'].compact().length==0) {
+                self.location.reload();
+            }
+        }
+    }
+} 
+
+
+function deleteB() {
+    var index = arguments[0];
+    var callback = arguments[1];
+    var ditem = _GLOBAL_VAR["ditems"][index];
+    var message = "delete " + ditem.type_name +' "'+ditem.title +'" ?';
+    if(confirm(message)) {
+        if(callback){
+            if(typeof callback == 'function'){
+                callback();
+            }
+        }
+        if(index || index==0){
+            doDeleteB([_GLOBAL_VAR['ditems'][index]]);
+        }else{
+            doDeleteB([_GLOBAL_VAR['ditem']]);
+        }
+    }else {
+        resetMoreAction();
+        resetAllChecker();
+        return false;
+    }
+}
+
+function doDeleteB(bA) {
+    var urlIDA = [];
+    for(var i=0; i<bA.length; i++) {
+        urlIDA.push(bA[i].link_id);
+    }
+    var url = '/ditem_mana2/delete_b';
+    var params = "link_id="+urlIDA.join(",");
+    showCentralNoticer(DIS_10);
+    new Ajax.Request(url,
+    {
+        asynchronous:true,
+        evalScripts:false,
+        onComplete:function(request){
+            doDeleteBComplete(request, bA)
+        },
+        parameters:params
+    }
+    );
+    return false;
+}
+function doDeleteBComplete(request, bA) {
+    hideCentralNoticer();
+    resetMoreAction();
+    if(request.status=="200") {
+        if(_GLOBAL_VAR['back']){
+            self.location = _GLOBAL_VAR['back'];
+        }
+        else if (_GLOBAL_VAR['ditems'] && _GLOBAL_VAR['ditems'].size() != 0) {
+            for (var i = 0; i < bA.length; i++) {
+                var b = bA[i];
+                _GLOBAL_VAR['ditems'][b.index] = null;
+                removeDitem(b.index);
+                if(window.jQuery){
+                    jQuery('#ditemItemsWraper .ditemImageGrid').diigowf('reload');
+                }
+            }
+            if (_GLOBAL_VAR['ditems'].compact().length == 0) {
+                self.location.reload();
+            }
+        }
+        else {
+            self.location = "/user/" + _GLOBAL_VAR['ditem'].user_name;
+        }
+        
+    }
+} 
+
+function removeDitem(index) {
+    Element.remove("ditemItem_"+index);
+}
+
+function removeListDitem(index) {
+    // after modified position. the _GLOBAL_VAR['ditems'][index].potision is not reliable.
+    var el = $("ditemItem_"+index).up();
+    el.remove();
+}
+
+/* mark unread/readed */
+function markUnread() {
+    doMarkUnreadRead([_GLOBAL_VAR['ditems'][arguments[0]]], 0);
+}
+function markRead() {
+    doMarkUnreadRead([_GLOBAL_VAR['ditems'][arguments[0]]], 1)
+}
+function doMarkUnreadRead(bA, mark) {
+    if(bA.length==0) return false;
+    var link_id = "";
+    for(var i=0; i<bA.length; i++) {
+        link_id += bA[i].link_id+","
+    }
+    if(link_id=="") return false;
+    var url = "/ditem_mana2/mark_readed";
+    var params = "link_id="+link_id+"&readed="+mark;
+    showCentralNoticer(DIS_10);
+    new Ajax.Request(url,
+    {
+        asynchronous:true,
+        evalScripts:true,
+        onComplete:function(request){
+            markUnreadComplete(request, bA, mark)
+        },
+        parameters:params
+    }
+    );
+    return false;
+}
+function markUnreadComplete(request, bA, mark) {
+    hideCentralNoticer();
+    if(request.status=="200") {
+        for(var i=0; i<bA.length; i++) {
+            var index = bA[i].index;
+            /* change title style */
+            var b = _GLOBAL_VAR['ditems'][index];
+            b.readed = mark;
+            var titleEl = $("titleLink_"+index);
+            // mark unread
+            if(b.readed==1) {
+                titleEl.className = 'readed';
+            }else {
+                titleEl.className = 'unread';
+            }
+        /* change title style */
+        }
+
+    }
+    resetMoreAction();
+    resetChecker(index);
+}
+
+function markTempRead(index){
+	$("titleLink_"+index).className = 'readed';
+}
+
+function clickMarkRead(index){
+	var bA = [_GLOBAL_VAR['ditems'][index]];
+	doMarkRead(bA);
+}
+
+function doMarkRead(bA) {                  
+    if(bA.length==0) return false;
+    var link_id = "";
+    for(var i=0; i<bA.length; i++) {
+        link_id += bA[i].link_id+","
+    }
+    if(link_id=="") return false;
+    var url = "/ditem_mana2/mark_readed";
+    var params = "link_id="+link_id;
+    showCentralNoticer(DIS_10);
+    new Ajax.Request(url,
+    {
+        asynchronous:true,
+        evalScripts:true,
+        onComplete:function(request){
+            markReadComplete(request, bA)
+        },
+        parameters:params
+    }
+    );
+    return false;
+}
+
+function markReadComplete(request,bA){
+    hideCentralNoticer();
+    if(request.status=="200") {
+        for(var i=0; i<bA.length; i++) {
+            var index = bA[i].index;
+            $("titleLink_"+index).className = 'readed';
+			$('action_markRead_'+index).remove();
+        }
+    }
+    resetMoreAction();
+}
+
+/* mark ditem mode */
+function markModePublic() {
+    doMarkMode([_GLOBAL_VAR['ditems'][arguments[0]]], 0);
+}
+function markModePrivate() {
+    doMarkMode([_GLOBAL_VAR['ditems'][arguments[0]]], 2);
+}
+function doMarkMode(bA, mode) {                  
+    if(bA.length==0) return false;
+    var link_id = "";
+    for(var i=0; i<bA.length; i++) {
+        link_id += bA[i].link_id+","
+    }
+    if(link_id=="") return false;
+    var url = "/ditem_mana2/convert_mode";
+    var params = "link_id="+link_id+"&mode="+mode;
+    showCentralNoticer(DIS_10);
+    new Ajax.Request(url,
+    {
+        asynchronous:true,
+        evalScripts:true,
+        onComplete:function(request){
+            markModeComplete(request, bA, mode)
+        },
+        parameters:params
+    }
+    );
+    return false;
+}
+function markModeComplete(request, bA, mode) {
+    hideCentralNoticer();
+    if(request.status=="200") {
+        for(var i=0; i<bA.length; i++) {
+            var index = bA[i].index;
+            // mark mode
+            var b = _GLOBAL_VAR['ditems'][index];
+            b.mode = mode;
+            var title = $("title_"+index).up();
+            if(b.mode==0) {
+                title.removeClassName("private");
+            }else {
+                title.addClassName("private");
+            }
+        }
+    }
+    resetMoreAction();
+}
+
+/*
+  more action for Diigo v6
+  Author: Yixi
+  2013-3-27
+*/
+
+
+/* more action */
+function doAction() {
+    if(arguments.length<1)
+        var cmd = this.value;
+    else
+        var cmd = arguments[0];
+    switch(cmd) {
+        case '0':{
+            batchForwardB();
+        }
+        break;
+        case '2':{
+            batchmarkMode(0);
+        }
+        break;
+        case '3':{
+            batchmarkMode(2);
+        }
+        break;
+        case '4':{
+            batchDeleteB();
+        }
+        break;
+        case '6':{
+            batchExtract();
+        }
+        break;
+        case '7':{
+            batchMarkUnreadRead(1);
+        }
+        break;
+        case '8':{
+            batchMarkUnreadRead(0);
+        }
+        break;
+        case '9':{
+            newDitem();
+        }
+        break;
+        case '10':{
+            batchBlogthis();
+        }
+        break;
+        case '13':{
+            batchTraceDitem(1);
+        }
+        break;
+        case '14':{
+            batchTraceDitem(0);
+        }
+        break;
+        case '15': {
+            batchAddToBList();
+        }
+        break;
+        case '16': {
+            batchEditTags.bind(this)();
+        }
+        break;
+        case '25': {
+            batchRemoveBFromList();
+        }
+        break;
+    }
+    blurMoreAction();
+}
+function blurMoreAction() {
+    try {
+        for(var i=0; i<_moreActionSelectCount; i++) {
+            var action = $("moreAction_"+i);
+            if(action){
+                action.blur();
+            }
+        }
+    }catch(e) {
+    }
+}
+
+function batchForwardB(){
+    var checkedBA = whichBChecked();
+    if(checkedBA.length==0) {
+        flashNotice2(ALE_20);
+        resetMoreAction();
+        return false;
+    }
+    var index_a = [];
+    for(var i=0; i<checkedBA.length; i++) {
+        index_a.push(checkedBA[i].index);
+    }
+    forwardB(index_a);
+}
+
+function batchBlogthis(){
+    var checkedBA = whichBChecked();
+    if(checkedBA.length==0) {
+        flashNotice2(ALE_20);
+        resetMoreAction();
+        return false;
+    }
+    var bIDA = [];
+    for(var i=0; i<checkedBA.length; i++) {
+        bIDA.push(checkedBA[i].link_id);
+    }
+    postToDraftBlog(bIDA.join(","));
+}
+function batchMarkUnreadRead(mark) {
+    var checkedBA = whichBChecked();
+    if(checkedBA.length==0) {
+        flashNotice2(ALE_20);
+        resetMoreAction();
+        return false;
+    }
+    var bA = [];
+    for(var i=0; i<checkedBA.length; i++) {
+        if(checkedBA[i].readed == mark) {
+            resetChecker(checkedBA[i].index);
+        }else {
+            bA.push(checkedBA[i]);
+        }
+    }
+    doMarkUnreadRead(bA, mark);
+}
+function batchmarkMode(mode) {
+    var checkedBA = whichBChecked();
+    if(checkedBA.length==0) {
+        flashNotice2(ALE_20);
+        resetMoreAction();
+        return false;
+    }
+    var bA = [];
+    for(var i=0; i<checkedBA.length; i++) {
+        if(checkedBA[i].mode == mode) {
+            resetChecker(checkedBA[i].index);
+        }else {
+            bA.push(checkedBA[i]);
+        }
+    }
+    doMarkMode(bA, mode);
+}
+function batchDeleteB() {
+    if(_GLOBAL_VAR['checkedItemCount']==0) {
+        flashNotice2(ALE_20);
+        resetMoreAction();
+        return false;
+    }
+    if(confirm(ALE_26)) {
+        doDeleteB(whichBChecked());
+    }else {
+        resetMoreAction();
+        resetAllChecker();
+        return false;
+    }
+}
+function batchRemoveBFromList() {
+    if(_GLOBAL_VAR['checkedItemCount']==0) {
+        flashNotice2(ALE_20);
+        resetMoreAction();
+        return false;
+    }
+    if(confirm(ALE_33)) {
+        doRemoveBFromList(whichBChecked(), 0);
+    }else {
+        resetMoreAction();
+        resetAllChecker();
+        return false;
+    }
+}
+
+function doPrint(bID) {
+    var form = document.forms["extractForm"];
+    if(!form) {
+        form = document.createElement("form");
+        form.name = "extractForm";
+        form.method = "post";
+        form.action = "/ditem_mana2/extract";
+        var hidden = document.createElement("input");
+        hidden.type = "hidden";
+        hidden.name = "b_id";
+        hidden.value = bID;
+        form.appendChild(hidden);
+        form.style.display = "none";
+        document.body.appendChild(form);
+    }else {
+        form.b_id = bID;
+    }
+    form.submit();
+}
+function newDitem() {
+    var url="/post/index?referInfo="+self.location;
+    self.location = url;
+}
+function blogThis() {
+    postToDraftBlog(_GLOBAL_VAR['ditems'][this.index].b_id);
+}
+
+function postToDraftBlog(bID) {
+    var form = document.forms["blogThisForm"];
+    if(!form) {
+        form = document.createElement("form");
+        form.name = "blogThisForm";
+        form.method = "post";
+        form.action = "/blog_this/draft_blog";
+        var hidden = document.createElement("input");
+        hidden.type = "hidden";
+        hidden.name = "link_id";
+        hidden.value = bID;
+        form.appendChild(hidden);
+        form.style.display = "none";
+        document.body.appendChild(form);
+    }else {
+        form.b_id = bID;
+    }
+    form.submit();
+}
+
+function whichBChecked() {
+    var checkedBA = [];
+    for(var i=0; i<_GLOBAL_VAR['ditems'].length; i++) {
+        if(typeof(_GLOBAL_VAR['ditems'][i])=="undefined" || !_GLOBAL_VAR['ditems'][i]) continue;
+        if(_GLOBAL_VAR['ditems'][i].checked){
+            checkedBA.push(_GLOBAL_VAR['ditems'][i]);
+        }
+    }
+    return checkedBA;
+}
+function resetMoreAction() {
+    try {
+        for(var i=0; i<_moreActionSelectCount; i++) {
+            var action = $("moreAction_"+i);
+            if(action){
+                action.value = "-1";
+                action.disabled = false;
+                action.blur();
+            }
+        }
+    }catch(e) {
+    }
+}
+function lockMoreAction(cmd) {
+    for(var i=0; i<_moreActionSelectCount; i++) {
+        var action = $("moreAction_"+i);
+        if(action){
+            action.value = cmd;
+            action.disabled = true;
+        }
+    }
+}
+
+function markDefaultECAction(mark) {
+    for(var i=0; i<_moreActionSelectCount; i++) {
+        var option = $("defaultEC_"+i);
+        // expand
+        if(mark=="0") {
+            option.value = "13";
+            option.innerHTML = option.innerHTML.replace("expand", "collapse");
+        // collapse
+        }else {
+            option.value = "14";
+            option.innerHTML = option.innerHTML.replace("collapse", "expand");
+        }
+    }
+}
+function getBatchActions() {
+    var batchActions = [];
+    var range = document;
+    var options = range.getElementsByTagName("option");
+    var names = "";
+    for(var j=0; j<options.length; j++) {
+        var name = options[j].getAttribute("name");
+        if(name=="batchAction") {
+            batchActions.push(options[j]);
+        }
+    }
+    return batchActions;
+}
+function batchTraceDitem(trace) {
+    var checkedBA = whichBChecked();
+    if(checkedBA.length==0) {
+        flashNotice2(ALE_20);
+        resetMoreAction();
+        return false;
+    }
+    var bA = [];
+    for(var i=0; i<checkedBA.length; i++) {
+        if(checkedBA[i].trace_id>0 && trace==1) {
+            resetChecker(checkedBA[i].index);
+        }else if(checkedBA[i].trace_id==0 && trace==0){
+            resetChecker(checkedBA[i].index);
+        }else {
+            bA.push(checkedBA[i]);
+        }
+    }
+    doTraceDitem(bA, trace);
+}
+
+//addToBList
+function checkBList() {
+    if(this.checked) {
+        _GLOBAL_VAR['lists'][this.index].checked = true;
+    }else {
+        _GLOBAL_VAR['lists'][this.index].checked = false;
+    }
+}
+
+function whichBListChecked() {
+    var checkedList = [];
+    for(var i=0; i<_GLOBAL_VAR['lists'].length; i++) {
+        var list = _GLOBAL_VAR['lists'][i];
+        if(typeof(list)=="undefined") continue;
+        if(list.checked) checkedList.push(list);
+    }
+    return checkedList;
+}
+
+function renderBelongTo(index) {
+    if(_GLOBAL_VAR['ditems'][index].lists_id.length>0) {
+        var belongTo = $("belongList_"+index);
+        if(belongTo){
+            var content = "in outliner: ";
+            for(var i=0; i<_GLOBAL_VAR['ditems'][index].lists_id.length; i++) {
+                var listID = _GLOBAL_VAR['ditems'][index].lists_id[i];
+                _GLOBAL_VAR['lists'].each(function(l) {
+                    if(l.id==listID) {
+                        var list = l;
+                        content += ", <a style='margin:0;' title=\"Go to outliner: "
+                        +list.title+"\" href=\""+list.uri+"\">"
+                        +list.title+"</a>";
+                    }
+                });
+            }
+            belongTo.innerHTML = content.replace("in outliner: , ", 'in outliner: ');
+        }
+    }
+}
+
+function batchEditTags() {
+    var checkedBA = whichBChecked();
+    if(checkedBA.length==0) {
+        flashNotice2(ALE_20);
+        resetMoreAction();
+        return false;
+    }
+    var pw = new PopWindow({
+        optEnabled: true,
+        left:150,
+        top:100,
+        title:"Revise tags",
+        root:"right_Column"
+    });
+    pw.appendNode(loadTagEditor());
+    pw.submit = doTagsEdit.bind(pw, $("tagEditForm"));
+    pw.cancel = function(){
+        resetMoreAction();
+        resetAllChecker();
+    }
+    $("editTags").clear().focus();
+    $("tagEditOption_2").checked = true;
+	
+    enabledSaveItemTagSuggestion("editTags");
+	
+    pw.show();
+}
+function loadTagEditor() {
+    if(_GLOBAL_VAR['tagEditor']) {
+        return _GLOBAL_VAR['tagEditor'];
+    }else {
+        var editor = new Element("form", {
+            id:"tagEditForm",
+            method:"post",
+            "onsubmit":"return false;"
+        });
+        row = new Element("div", {
+            className:"teItem"
+        });
+        row.appendChild(new Element("input", {
+            type:"text",
+            name:"editTags",
+            maxlength:255,
+            id:"editTags",
+            className:"inputTxt2"
+        }));
+        editor.appendChild(row);
+        row = new Element("div", {
+            className:"teItem"
+        });
+        row.appendChild(new Element("label", {
+            "for":"tagEditOption_2"
+        }).update("<p style='margin-top:5px;'><input type='radio' value='1' id='tagEditOption_2' name='editTagOption' />Add additional tags to selected items</p>"));
+        row.appendChild(new Element("label", {
+            "for":"tagEditOption_1"
+        }).update("<p style='margin-top:5px;'><input type='radio' value='0' id='tagEditOption_1' name='editTagOption' />Replace all tags on selected items by</p>"));
+        editor.appendChild(row);
+        _GLOBAL_VAR['tagEditor'] = editor;
+        return _GLOBAL_VAR['tagEditor'];
+    }
+}
+function doTagsEdit() {
+    var pw = this;
+    var form = arguments[0];
+    var tags = $F("editTags").trim();
+    if(tags=="") return false;
+    var checkedBA = whichBChecked();
+    if(checkedBA.length==0) return false;
+    var bIDA = [];
+    for(var i=0; i<checkedBA.length; i++) {
+        bIDA.push(checkedBA[i].link_id);
+    }
+    var params = $H({
+        link_id_a:bIDA
+    });
+    var url = "/ditem_mana2/batch_edit_tags";
+    pw.onLoading();
+    new Ajax.Request(url,
+    {
+        asynchronous:true,
+        evalScripts:false,
+        onComplete:function(request){
+            doTagsEditComplete(request, checkedBA, pw)
+        },
+        parameters : Form.serialize(form)+"&infos="+params.toJSON()
+    }
+    );
+    return false;
+}
+function doTagsEditComplete(request, checkedBA, pw) {
+    pw.onComplete({
+        status:request.status
+    });
+    resetMoreAction();
+    resetAllChecker();
+    if(request.status=="200"){
+        var tags = request.responseText.evalJSON();
+        var optionA = document.getElementsByName("editTagOption");
+        var option;
+        for(var i=0; i<optionA.length; i++) {
+            if(optionA[i].checked) option = optionA[i].value;
+        }
+        for(var i=0; i<checkedBA.length; i++) {
+            var index = checkedBA[i].index;
+            if(option=="0" || checkedBA[i].t_name=="no_tag") {
+                checkedBA[i].t_name = tags.uniq().join(",");
+            } else if(option=="1") {
+                t = checkedBA[i].t_name.blank() ? tags : checkedBA[i].t_name.split(",").concat(tags);
+                checkedBA[i].t_name = t.uniq().join(",");
+            }
+            refreshDitem(index);
+        }
+    }
+}
+function doAddToListAction() {
+    if(arguments.length<1)
+        var cmd = this.value;
+    else
+        var cmd = arguments[0];
+    switch(cmd) {
+        case '-1':{
+            }
+            break;
+        case '-2':{
+            self.location = "/ditem_list/new_list";
+        }
+        break;
+        default:{
+            _GLOBAL_VAR['lists'][cmd].checked = true;
+            doAddToList();
+        }
+    }
+}
+function doAddToList() {
+    var checkedBA = whichBChecked();
+    if(checkedBA.length==0) {
+        flashNotice2(ALE_20);
+        resetAddToList();
+        return false;
+    }
+    var checkedList = whichBListChecked();
+    if(checkedList.length==0) {
+        flashNotice2(ALE_36);
+        resetAddToList();
+        return false;
+    }
+    var listIDA = [];
+    for(var i=0; i<checkedList.length; i++) {
+        listIDA.push(checkedList[i].id);
+    }
+    var lIDA = [];
+    for(var i=0; i<checkedBA.length; i++) {
+        if(checkedBA[i].lists_id.indexOf(listIDA[0])!=-1) continue;
+        lIDA.push(checkedBA[i].link_id);
+    }
+    if(lIDA.length==0 || listIDA.length==0) {
+        resetListChecked();
+        resetAddToList();
+        return false;
+    }
+    var params = $H({
+        link_id_a:lIDA,
+        list_id_a:listIDA
+    });
+    var url = "/ditem_outliner/add_to_outliner";
+    lockAddToList();
+    showCentralNoticer(DIS_10);
+    new Ajax.Request(url,
+    {
+        asynchronous:true,
+        evalScripts:false,
+        onComplete:function(request){
+            doAddToListComplete(request, checkedBA, checkedList)
+        },
+        parameters : "infos="+params.toJSON()
+    }
+    );
+    return false;
+}
+
+function doAddToListComplete(request, checkedBA, checkedList) {
+    hideCentralNoticer();
+    resetAddToList();
+    resetListChecked();
+    resetAllChecker();
+    if(request.status=="200")  {
+        var lists = [];
+        for(var i=0; i<checkedList.length; i++) {
+            lists.push("<a style='text-decoration:underline;' href='"+checkedList[i].uri+"'>"+checkedList[i].title+"</a>");
+        }
+        flashNotice2("Added to Outliner: "+lists.join(", ")+" successfully!");
+        var checkedListID = [];
+        for(var i=0; i<checkedList.length; i++) {
+            checkedListID.push(checkedList[i].id);
+        }
+        for(var i=0; i<checkedBA.length; i++) {
+            checkedBA[i].lists_id = checkedBA[i].lists_id.concat(checkedListID).uniq();
+            renderBelongTo(checkedBA[i].index);
+        }
+    }else {
+        alert(EXC_1);
+    }
+}
+function resetListChecked() {
+    _GLOBAL_VAR['lists'].each(function(l) {
+        l.checked = false;
+    });
+}
+
+function lockAddToList() {
+    for(var i=0; i<2; i++) {
+        var action = $("addToList_"+i);
+        if(action){
+            action.disabled = true;
+        }
+    }
+}
+
+function resetAddToList() {
+    for(var i=0; i<2; i++) {
+        var action = $("addToList_"+i);
+        if(action){
+            action.value = "-1";
+            action.disabled = false;
+            action.blur();
+        }
+    }
+}
+/*---------------------------------------------
+ * advanced search
+ *--------------------------------------------*/
+function switchSearchHelper() {
+    var cusData = loadCusData();
+    if($("searchHelper").style.display=="none") {
+        switch2HelperMode();
+        cusData['adSearch'] = "1";
+    }else {
+        switch2SimpleMode();
+        cusData['adSearch'] = "0";
+    }
+    cusData.store();
+}
+function switch2HelperMode() {
+    var whatHolder = $("whatHolder");
+    var helperHolder = $("searchHelper");
+    var searchTips = $("searchTips");
+    whatHolder.style.display = "none";
+    helperHolder.style.display = "";
+    searchTips.style.display = "none";
+    _GLOBAL_VAR['adSearch'] = "1";
+    decodeAdSyntax('_dwhat');
+}
+function switch2SimpleMode() {
+    var whatHolder = $("whatHolder");
+    var helperHolder = $("searchHelper");
+    var searchTips = $("searchTips");
+    whatHolder.style.display = "";
+    helperHolder.style.display = "none";
+    searchTips.style.display = "none";
+    _GLOBAL_VAR['adSearch'] = "0";
+}
+function initAdSearchBar() {
+    if(defFullTextSearchMode=="1") {
+        switch2HelperMode();
+        return true;
+    }else if(defFullTextSearchMode=="0") {
+        switch2SimpleMode();
+        return true;
+    }
+    var cusData = loadCusData();
+    if(cusData['adSearch'] == "1") {
+        switch2HelperMode();
+    }else {
+        switch2SimpleMode();
+    }
+}
+function doFSearch2() {
+    var what = $F("_dwhat").trim();
+    if(_GLOBAL_VAR['adSearch'] == "0") {
+        what = $F("_dwhat").trim();
+    }else {
+        what = encodeAdSyntax();
+    }
+    var scope = $F("_dsscope").trim();
+    var url = '';
+    if(self.location.href.indexOf('sa=Search') !=-1 ) {
+        url = self.location.href.replace(/q=.+&/, "q="+what+"&");
+    }else {
+        url = "/search?adSScope="+scope+"&what="+encodeURIComponent(what);
+    }
+    self.location = url;
+    return false;
+} 
+
+/*--------------------------------------------
+ * Tag Auto Suggestion
+ *-------------------------------------------*/
+function filterItemsTags(items) {  
+    this.temItemIndex = -1;
+    this.clearItems();
+    var size = items.length;
+    var na = this.inputField.value; 
+    if(na.lastIndexOf(" ")!=-1) {
+        na = na.substring(na.lastIndexOf(" ")+1, na.length);
+    }else if(na.lastIndexOf(",")!=-1) {
+        na = na.substring(na.lastIndexOf(",")+1, na.length);
+    }
+    if(na=="") {
+        return false;
+    }
+    var j = 0;
+    var itemRegExp = new RegExp("^("+na.replace(/\+/g, '&#43;').replace(/\./g, '\\.')+").*", 'i');
+    for(var i = 0; i < size; i++) {
+        var itemTxt = this.items[i].tName;
+        if(itemRegExp.test(itemTxt)) {
+            this.lockSubmit();
+            var row = document.createElement("li");
+            row.className = "mouseOut";
+            row.id = this.itemPrefix+"Item_"+j;
+            row.name = i;
+            row.object = this;
+            row.onclick = function(){
+                this.object.populateItems(this);
+                // cursor focus
+                this.object.inputField.focus();
+                // submit in my library paname
+                try{
+                    var form = this.object.inputField.up();
+                    if(form){
+                        form.onsubmit();
+                    }
+                }catch(e){}
+            }
+            row.onmouseout = function() {
+                this.className='mouseOut';
+            };
+            row.onmouseover = function() {
+                this.className='mouseOver';
+                this.object.temItemIndex=parseInt(this.name);
+            };
+            var _txt = new String(itemTxt);
+            if(_txt.indexOf(" ")!=-1) _txt="\""+_txt+"\"";
+            row.innerHTML = _txt;
+            this.completeDiv.appendChild(row);
+            j++;
+        }
+    }
+    var _item = document.getElementById(this.itemPrefix+"Item_"+(this.temItemIndex+1));
+    if(_item) {
+        this.completeDiv.style.display = "";
+        this.setOffsets();
+    }
+}
+function autoCompletePopulateTag(row) {
+    if(!row){
+        return false;
+    }
+    this.updateInput(row.innerHTML);
+
+    this.clearItems();
+}
+function enabledSaveItemTagSuggestion(suggestionElID){
+    var autoCompleteTag = new AutoComplete(suggestionElID,"popupTag","");
+    autoCompleteTag.autoSizeInput = false;
+    autoCompleteTag.filterItems = filterItemsTags;
+    autoCompleteTag.populateItems = autoCompletePopulateTag;
+    if(!_GLOBAL_VAR['my_all_tags']) {
+        new Ajax.Request("/tag_mana2/load_user_tags",
+        {
+            asynchronous:true,
+            evalScripts:false,
+            onComplete:function(request){
+                if(request.status=="200") {
+                    _GLOBAL_VAR['my_all_tags'] = eval(request.responseText);
+                    autoCompleteTag.items = _GLOBAL_VAR['my_all_tags'];
+                    autoCompleteTag.turnOn();
+                }
+            }
+        });
+    }else{
+        autoCompleteTag.items = _GLOBAL_VAR['my_all_tags'];
+        autoCompleteTag.turnOn();
+    }
+}
+function initAutoCompleteTag() {
+    var autoCompleteTag = new AutoComplete("tagsCrumbInput","popupTag","tagCrumbSubmit");
+    autoCompleteTag.filterItems = filterItemsTags;
+    autoCompleteTag.populateItems = autoCompletePopulateTag;
+    autoCompleteTag.items = _GLOBAL_VAR['tags'];
+    autoCompleteTag.turnOn();
+}
+/*----------------------------------
+ * others
+ *---------------------------------*/
+function showNoticer(noticer, word) {
+    noticer.show();
+    noticer.update(word);
+}  
+function hideNoticer(noticer) {                 
+    noticer.hide();
+} 
+function changeListCount(count) {
+    var cusData = loadCusData();
+    cusData['count'] = count;
+    cusData.store();
+    self.location.reload();
+}
+function clickFollowMeOnTwitter(){
+    var cusData = loadCusData();
+    cusData['followMe'] = 'yes';
+    cusData.store();
+}
+function isFollowedMeOnTwitter(){
+    var cusData = loadCusData();
+    return cusData['followMe'] == 'yes' ? true : false;
+}
+function setDefaultEC(cmd) {
+    var cusData = loadCusData();
+    if(cmd=='13') {
+        cusData['default_ec'] = "1";
+    }else {
+        cusData['default_ec'] = "0";
+    }
+    cusData.store();
+    resetMoreAction();
+}
+
+function switchPreview(t, index, readed) {
+    var el = $(t);
+    if(readed==undefined){
+        readed=1;
+    }
+    var pBox = $("b_preview_box_"+index);
+    if(pBox) {
+        if(pBox.style.display=="none") {
+            pBox.style.display = "";
+        }else {
+            pBox.style.display = "none";
+        }
+    }else {
+        createPreviewBox(el, index, readed);
+    }
+}
+function hidePreiview() {
+    var index = arguments[0];
+    var pBox = $("b_preview_box_"+index);
+    pBox.style.display = "none";
+}
+function createPreviewBox(el, index, readed) {
+    try{
+//        var bBox = el.up();//$("ditemItem_"+index).select('h3["class"="ditemItem"]')[0];/
+        var bBox = $("ditemItem_"+index).select(".ditemTitleArea")[0];
+        var pBox = new Element("div", {
+            className:"previewBox",
+            id:"b_preview_box_"+index
+        });
+        var pBar = new Element("div", {
+            className:"previewBar"
+        });
+        var cloBtn = new Element("a", {
+            className:"pCloser",
+            href:"javascript:void(0);"
+        }).update("Close");
+        cloBtn.onclick = hidePreiview.bind(cloBtn,index);
+        pBar.appendChild(cloBtn);
+        var newWindow = new Element("a", {
+            rel:"nofollow",
+            className:"pNewWindow",
+            href:_GLOBAL_VAR['ditems'][index].url,
+            target:"_blank"
+        }).update("New window");
+        newWindow.onclick = hidePreiview.bind(cloBtn,index);
+        pBar.appendChild(newWindow);
+        pBox.appendChild(pBar);
+        var previewInner = new Element("div", {
+            className:"previewInner"
+        });
+        var url = _GLOBAL_VAR['ditems'][index].url;
+        previewInner.appendChild(new Element("iframe", {
+            className:"previewIFrame",
+            id:"b_preview_"+index,
+            frameBorder:"0",
+            "src":url
+        }));
+        pBox.appendChild(previewInner);
+        Element.insert(bBox, {
+            after:"<div id=\"b_preview_outter_"+index+"\"></div>"
+        });
+        $("b_preview_outter_"+index).appendChild(pBox);
+    }catch(e){
+    }
+}
+/*--------------------------------------
+ * my site
+ *-------------------------------------*/
+//function doHideStickyNote(index) {                          
+//    var indexA = index.split("_");
+//    var id = _GLOBAL_VAR['ditems'][indexA[0]].annotations[indexA[1]].stickyNotes[indexA[2]].id;
+//    var h_id = _GLOBAL_VAR['ditems'][indexA[0]].annotations[indexA[1]].h_id;
+//    var url = '/my_site/hide_sticky_note';
+//    var params = "id="+id+"&h_id="+h_id;  
+//    new Ajax.Request(url, 
+//    {
+//        onLoading:function(request){doHideStickyNoteLoading(request, index);}, 
+//        onComplete:function(request){doHideStickyNoteComplete(request, index);}, 
+//        parameters:params}
+//); 
+//    return false; 
+//} 
+function doHideStickyNoteLoading(request, index) { 
+    $("sticky_"+index).style.backgroundColor = "#eee";
+    var hider = $("hideStickyNote_"+index);
+    hider.innerHTML = WORD_3;
+    hider.onclick = null;
+}   
+function doHideStickyNoteComplete(request, index) {  
+    if(request.status=="200") {
+        var indexA = index.split("_");
+        var s_mode = _GLOBAL_VAR['ditems'][indexA[0]].annotations[indexA[1]].mode;
+        delete(_GLOBAL_VAR['ditems'][indexA[0]].annotations[indexA[1]].stickyNotes[indexA[2]]);
+        _GLOBAL_VAR['ditems'][indexA[0]].annotations[indexA[1]].s_count--;
+        if (s_mode=="0") {
+            _GLOBAL_VAR['ditems'][indexA[0]].pub_sticky_count--;
+        }else {
+            _GLOBAL_VAR['ditems'][indexA[0]].pri_sticky_count--;
+        }
+        refreshDetailsCount(indexA[0]);
+        if(_GLOBAL_VAR['ditems'][indexA[0]].annotations[indexA[1]].s_count<=0) {
+            $("sticky_"+indexA[0]+"_"+indexA[1]).style.display = "none";
+            changeHighlightColor(indexA[0]+"_"+indexA[1], 2);
+            var removeA = $("removeA_"+indexA[0]+"_"+indexA[1]);
+            if(removeA) removeA.style.display = "";
+        }
+    
+        Element.remove("sticky_"+index);
+        
+        countDetails(indexA[0]);
+    }else {
+}
+
+} 
+function doHideComment(index) {
+    var indexA = index.split("_");
+    var id = _GLOBAL_VAR['ditems'][indexA[0]].comments[indexA[1]].id;
+    try{
+        var url = '/my_site/hide_comment';
+        var params = "id="+id;
+        new Ajax.Request(url,
+        {
+            onLoading:function(request){
+                doHideCommentLoading(request, index)
+            },
+            onComplete:function(request){
+                doHideCommentComplete(request, index)
+            },
+            parameters:params
+        }
+        );
+        return false;
+    }catch(e) {
+        return false;
+    }
+}
+function doHideCommentLoading(request, index) { 
+    $("comment_"+index).style.backgroundColor = "#eee";
+    var hider = $("hideComment_"+index);
+    hider.innerHTML = WORD_3;
+    hider.onclick = null;
+}   
+function doHideCommentComplete(request, index) { 
+    if(request.status=="200") {
+        var indexA = index.split("_");
+        var c_mode = _GLOBAL_VAR['ditems'][indexA[0]].comments[indexA[1]].mode;
+        delete(_GLOBAL_VAR['ditems'][indexA[0]].comments[indexA[1]]);
+        _GLOBAL_VAR['ditems'][indexA[0]].c_count--;
+        if(c_mode.mode=="0") {
+            _GLOBAL_VAR['ditems'][indexA[0]].pub_c_count--;
+        }else {
+            _GLOBAL_VAR['ditems'][indexA[0]].pri_c_count--;
+        }
+        refreshDetailsCount(indexA[0]);
+        Element.remove("comment_"+index);
+        
+        countDetails(indexA[0]);
+    }else {
+}
+
+}
+
+
+
+/*======================================
+ *
+ * forward item
+ * 
+ *======================================*/
+function forwardItem(args) {
+    var toggler = this;
+    var pw;
+    
+    /*------------------------------------
+     * init for each type
+     *------------------------------------*/
+    if(args.type=='list') {
+        var root = "column";
+        pw = new PopWindow({
+            optEnabled: true,
+            center:true,
+            top:20,
+            width:500,
+            title:"Send"
+        });
+        pw.submitBtn.value = "Send";
+        pw.cancelBtn.value = "Cancel";
+        
+    }else if(args.type=='ditem') {
+        
+        var index_a = args.index_a;
+        var top = 0;
+        var root="right_Column";
+        if(args.index_a.length == 1){
+            root="ditemItem_"+args.index_a[0];
+        }
+        pw = new PopWindow({
+            optEnabled: true,
+            center:true,
+            top:top+20,
+            fixTop:-100,
+            width:500,
+            title:"Send To"
+        });
+        pw.submitBtn.value = "Send";
+        pw.cancelBtn.value = "Cancel";
+        pw.cancel = function(){
+            resetMoreAction();
+            resetAllChecker();
+        }
+    }
+
+    pw.onLoading();
+    if(args.type=='ditem'){
+        var need = [],
+            global_hash = {};
+        for(var _i =0;_i<args.index_a.length;_i++){
+            if(!_GLOBAL_VAR['ditems'][args.index_a[_i]].share_link){
+                if(_GLOBAL_VAR['ditems'][args.index_a[_i]].typeName!=='bookmark'){
+                    need.push(_GLOBAL_VAR['ditems'][args.index_a[_i]].link_id);
+                    global_hash[_GLOBAL_VAR['ditems'][args.index_a[_i]].link_id] = _GLOBAL_VAR['ditems'][args.index_a[_i]];
+                }
+            }
+        }
+
+        if(need.length > 0) {
+            new Ajax.Request('/item/get_share_url',
+                {
+                    asynchronous: true,
+                    evalScripts: false,
+                    onComplete: function (request) {
+                        var res = JSON.parse(request.responseText);
+                        for (var key in res) {
+                            global_hash[key].share_link = res[key].shared_url;
+                        }
+                        pw.appendNode(loadForwardTemp(args));
+                    },
+                    parameters: "link_id_a=" + encodeURIComponent(need.join())
+                });
+        }else{
+            pw.appendNode(loadForwardTemp(args));
+        }
+    }else{
+        pw.appendNode(loadForwardTemp(args));
+    }
+    pw.submit = function(){
+        var url = "/message_mana/send_msg";
+        var sendTo = $("sendToSelector").value;
+        var json = {};
+        switch(sendTo) {
+            case "all":{
+                json["send_type"] = "all";
+            }
+            break;
+            case "some":{
+                json["send_type"] = "some";
+                json["send_to"] = _GLOBAL_VAR[_GLOBAL_VAR["bACCID"]+"_instance"].getRecItems();
+            }
+            break;
+            case "myself":{
+                json["send_type"] = "myself";
+                json["send_to"] = sendTo;
+            }
+            break;
+            default: {
+                json["send_type"] = "list";
+                json["send_to"] = sendTo;
+            }
+            break;
+        }
+        json["privacy"] = "private";
+        var ff = $("forwardForm");
+        json["subject"] = ff.subject.value;
+        json["message"] = ff.message.value;
+        if(args.type=='ditem') {
+//            if(ff.includeA.checked){
+            	$A($("forwardPreview").getElementsByClassName("eSTail")).each(function(r){r.remove()});
+                json["quotes"] = $("forwardPreview").innerHTML;
+//            }
+        }else if(args.type=='list'){
+            json["quotes"] = $("forwardPreview").innerHTML;
+        }
+        this.onLoading();
+        new Ajax.Request(url,
+        {
+            asynchronous:true,
+            evalScripts:false,
+            onComplete:function(request){
+                PopWindow.instance.onComplete({
+                    status:request.status,
+                    msg:"message sent"
+                });
+                resetMoreAction();
+                resetAllChecker();
+            },
+            parameters:"json="+encodeURIComponent(Object.toJSON(json))
+        });
+        return false;
+    }.bind(pw);
+    
+    /*--------------------------------
+     * init contacts
+     *--------------------------------*/
+    if(!ACContact.contacts || ACContact.contacts.length==0){
+        pw.onLoading();
+        var url = "/user_mana2/load_contacts";
+        new Ajax.Request(url,
+        {
+            asynchronous:true,
+            evalScripts:false,
+            method:'get',
+            onComplete:function(request){
+                if(request.status=="200") {
+                    var contacts = request.responseText.evalJSON();
+                    _GLOBAL_VAR[_GLOBAL_VAR["bACCID"]+"_instance"] = new ACContact({
+                        rec:$(_GLOBAL_VAR["bACCID"]),
+                        contacts:contacts,
+                        showTipInBox: false
+                    });
+                    initContactsSelect();
+                    PopWindow.instance.noticer.hide();
+                    PopWindow.instance.content.show();
+                    PopWindow.instance.opt.show();
+                    PopWindow.instance.reCalShadowRange();
+                }
+            }
+        });
+        return false;
+    }else {
+        _GLOBAL_VAR[_GLOBAL_VAR["bACCID"]+"_instance"] = new ACContact({
+            rec:$(_GLOBAL_VAR["bACCID"]),
+            showTipInBox: false
+        });
+        initContactsSelect();
+        PopWindow.instance.noticer.hide();
+        PopWindow.instance.content.show();
+        PopWindow.instance.opt.show();
+        PopWindow.instance.reCalShadowRange();
+    }
+}
+        
+/*=================================
+ *
+ * forward template
+ * 
+ *=================================*/
+function loadForwardTemp(args) {
+            
+    var table = new Element("table", {
+        id:"forwardTable"
+    });
+    var tbody = new Element("tbody");
+            
+    // send to
+    var tr = new Element("tr",{
+        style:"display:none"
+    });
+    tr.appendChild(new Element("th").update("Send to:"));
+    var td = new Element("td", {
+        id:"sendToTD"
+    });
+    tr.appendChild(td);
+    
+//    // options
+//    td = new Element("td", {
+//        id:"forwardOptions"
+//    });
+//
+//    td.appendChild(new Element("label").update("<input type='checkbox' id='sendToPublic' /> Add to my EasyBlog?"));
+//
+//    if(args.type=='ditem') {
+//        td.appendChild(new Element("label").update("<input type='checkbox' checked='checked' name='includeA' onclick='includeAnnotations.bind(this)();' /> Include quotes"));
+//    //td.appendChild(new Element("a").update("Rich formatting &raquo;"));
+//    }
+    
+    tr.appendChild(td);
+    tbody.appendChild(tr);
+            
+    // contacts
+    tr = new Element("tr", {
+        id:"contactRow"
+    });
+    tr.appendChild(new Element("th").update("Send to:"));
+    td = new Element("td", {
+        "colspan":"2"
+    });
+    var div = new Element("div", {
+        className:"accOuter"
+    });
+    div.appendChild(new Element("div", {
+        id:_GLOBAL_VAR["bACCID"],
+        className:"inputTxt2"
+    }).hide());
+    td.appendChild(div);
+    tr.appendChild(td);
+    tbody.appendChild(tr);
+            
+    // subject
+    tr = new Element("tr", {
+        id:"subjectRow"
+    });
+    tr.appendChild(new Element("th").update("Subject:"));
+    var subEl = new Element("input", {
+        type:"text",
+        name:"subject",
+        maxlength:255,
+        className:"inputTxt2"
+    });
+            
+    if(args.type=='ditem') {
+        subEl.value = _GLOBAL_VAR['ditems'][args.index_a[0]].title;
+    }else if(args.type=='list') {
+        subEl.value = _GLOBAL_VAR['list'].title;
+    }
+        
+    td = new Element("td", {
+        "colspan":"2"
+    });
+    td.appendChild(subEl);
+    tr.appendChild(td);
+    tbody.appendChild(tr);
+        
+    
+    tr = new Element("tr");
+    tr.appendChild(new Element("th").update("Message:"));
+    tbody.appendChild(tr);
+
+    // message
+    tr = new Element("tr");
+    td = new Element("td", {
+        "colspan":"3"
+    });
+    td.appendChild(new Element("textarea", {
+        "name":"message",
+        className:"inputTxt2"
+    }));
+    tr.appendChild(td);
+    tbody.appendChild(tr);
+    table.appendChild(tbody);
+
+    var form = new Element("form", {
+        id:"forwardForm"
+    });
+    form.setAttribute('autocomplete', 'off');
+    form.appendChild(table);
+
+    // preview box
+    var preBox = new Element("div", {
+        "id":"forwardPreview"
+    });
+    if(args.type=='ditem') {
+        preBox.appendChild(loadAnnotations(args.index_a))
+    }else if(args.type=='list') {
+        preBox.setStyle({
+            "height":"1%"
+        });
+        if(_GLOBAL_VAR['list'].mode==2) {
+            preBox.update("<p><a href='"+BOOKMARK_HOST+"/list?token="+_GLOBAL_VAR['token']+"'>"+_GLOBAL_VAR['list'].title +" "+ BOOKMARK_HOST+"/list?token="+_GLOBAL_VAR['token'] + "</a></p><p>"+_GLOBAL_VAR['list'].desc+"</p>");
+        }else {
+            preBox.update("<p><a href='"+BOOKMARK_HOST+"/list/"+_GLOBAL_VAR['username']+"/"+_GLOBAL_VAR['list'].uri+"'>"+_GLOBAL_VAR['list'].title+ " " + BOOKMARK_HOST+"/list/"+_GLOBAL_VAR['username']+"/"+_GLOBAL_VAR['list'].uri +"</a></p><p>"+_GLOBAL_VAR['list'].desc+"</p>");
+        }
+    }
+    form.appendChild(preBox);
+    return form;
+
+}
+
+
+
+/*======================================
+ *
+ * share item
+ * 
+ *======================================*/
+function shareItem(args) {
+    
+    var toggler = this;
+    var pw;
+    
+    /*------------------------------------
+     * init for each type
+     *------------------------------------*/
+    if(args.type=='list') {
+    }else if(args.type=='ditem') {
+        var index_a = args.index_a;
+        var root="leftColumn";
+        var top = 0;
+		
+        if(args.index_a.length == 1){
+            root="ditemItem_"+ args.index_a[0];
+        }
+				
+        //        var p = $("leftColumn").viewportOffset();
+        //        if(p[1]<0) {
+        //            top = 0 - p[1];
+        //        }
+		
+        pw = new PopWindow({
+            optEnabled: true,
+            left:120,
+            top:top+20,
+            width:500,
+            title:"Share with my friends on Diigo",
+            root:root
+        });
+        pw.cancel = function(){
+            resetMoreAction();
+            resetAllChecker();
+        }
+        index_a.each(function(index){
+            switchDetails(index, "collapse");
+        })
+    }
+
+    pw.appendNode(loadShareItemTemp(args));
+    pw.submit = function(){
+        var url = "/contact/share_ditem_to_list";
+        var shareTo = $("shareItemToSelector").value;
+        var link_id = _GLOBAL_VAR["ditems"][args.index_a[0]].link_id;
+        var params = null;
+        if(shareTo==-2){
+            params = "&link_id="+link_id
+        }else{
+            params = "list="+shareTo+"&link_id="+link_id;
+        }
+        this.onLoading();
+        new Ajax.Request(url,
+        {
+            asynchronous:true,
+            evalScripts:false,
+            onComplete:function(request){
+                PopWindow.instance.onComplete({
+                    status:request.status
+                });
+                resetMoreAction();
+                resetAllChecker();
+            },
+            parameters:params
+        });
+        return false;
+    }.bind(pw);
+    
+    /*--------------------------------
+     * init contacts
+     *--------------------------------*/
+    if(!_GLOBAL_VAR["contactLists"]){
+        pw.onLoading();
+        var url = "/user_mana2/load_contact_lists";
+        new Ajax.Request(url,
+        {
+            asynchronous:true,
+            evalScripts:false,
+            method:'get',
+            onComplete:function(request){
+                if(request.status=="200") {
+                    var contacts = request.responseText.evalJSON();
+                    _GLOBAL_VAR["contactLists"] = contacts;
+                    initShareToCLSelect();
+                    PopWindow.instance.noticer.hide();
+                    PopWindow.instance.content.show();
+                    PopWindow.instance.opt.show();
+                    PopWindow.instance.reCalShadowRange();
+                }
+            }
+        });
+        return false;
+    }else {
+        initShareToCLSelect();
+    }
+}
+        
+function initShareToCLSelect() {
+    var td = $("shareItemToContactTD");
+    if(_GLOBAL_VAR["contactLists"].length==0) {
+        td.appendChild(new Element("a", {
+            "href":"/contact/new_list"
+        }).update("No contact list. You can create one now."));
+        $("wOptions").hide();
+    }else {
+        var s = new Element("select", {
+            "id":"shareItemToSelector"
+        });
+        s.appendChild(new Element("option", {
+            "value":"-2"
+        }).update("All Friends"));
+        var og = new Element("optgroup", {
+            "label":"Or Friends in a Contact List"
+        });
+        for(var i=0; i<_GLOBAL_VAR["contactLists"].length; i++) {
+            var cl = _GLOBAL_VAR["contactLists"][i];
+            var o = new Element("option", {
+                "value":cl.id
+            }).update(cl.extra.title);
+            og.appendChild(o);
+        }
+        s.appendChild(og);
+        if(_GLOBAL_VAR["contactLists"].length>1) {
+            s.appendChild(new Element("option", {
+                "value":-1
+            }).update("------------"));
+        }
+        s.appendChild(new Element("option", {
+            "value":-2
+        }).update("Create a Contact List..."));
+        td.appendChild(s);
+        s.value = -2;
+            
+    }
+}
+    
+/*=================================
+ *
+ * share template
+ * 
+ *=================================*/
+function loadShareItemTemp(args) {
+        
+    var table = new Element("table", {
+        id:"shareItemTable"
+    });
+    var tbody = new Element("tbody");
+        
+    // contacts
+    tr = new Element("tr");
+    tr.appendChild(new Element("th"));
+    td = new Element("td", {
+        "id": "shareItemToContactTD"
+    });
+    tr.appendChild(td);
+    tbody.appendChild(tr);
+        
+    table.appendChild(tbody);
+        
+    var form = new Element("form", {
+        id:"shareItemForm"
+    });
+    form.setAttribute('autocomplete', 'off');
+    form.appendChild(table);
+        
+    return form;
+}
+
+function likeThisLink(link_id,ori_user_id){
+    var like_button_id = this.id
+    var url = "/item_mana/like_link";
+    showCentralNoticer(DIS_10);
+    new Ajax.Request(url,
+    {
+        asynchronous:true,
+        evalScripts:false,
+        parameters:{
+            link_id:link_id,
+            ouid : ori_user_id
+        },
+        onComplete:function(request){
+            hideCentralNoticer();
+            if(request.status=='200') {
+                var like_elem = $(like_button_id);
+                like_elem.innerHTML = like_elem.innerHTML.replace("Like","Unlike");
+                like_elem.addClassName("unlike");
+                like_elem.removeClassName("like");
+                like_elem.onclick = function(){
+                    if(ori_user_id){
+                        unlikeThisLink.bind(this)(link_id,ori_user_id);
+                    }else{
+                        unlikeThisLink.bind(this)(link_id);
+                    }
+                };
+                var result = request.responseText.evalJSON();
+                var like_span = $("likeSpan_"+result.link_id);
+                if(like_span){
+                    like_span.innerHTML = result.value;
+                    like_span.show();
+                }
+            }
+        }
+    }
+    );
+    return false;
+}
+
+function unlikeThisLink(link_id,ori_user_id){
+    var like_button_id = this.id;
+    var url = "/item_mana/unlike_link";
+    showCentralNoticer(DIS_10);
+    new Ajax.Request(url,
+    {
+        asynchronous:true,
+        evalScripts:false,
+        parameters:{
+            link_id:link_id
+        },
+        onComplete:function(request){
+            hideCentralNoticer();
+            if(request.status=='200') {
+                var like_elem = $(like_button_id);
+                like_elem.innerHTML = like_elem.innerHTML.replace("Unlike","Like");
+                like_elem.removeClassName("unlike");
+                like_elem.addClassName("like")
+                like_elem.onclick = function(){
+                    if(ori_user_id){
+                        likeThisLink.bind(this)(link_id,ori_user_id);
+                    }else{
+                        likeThisLink.bind(this)(link_id);
+                    }
+					
+                };
+                var result = request.responseText.evalJSON();
+                var like_span = $("likeSpan_"+result.link_id);
+                if(like_span){
+                    like_span.innerHTML = result.value;
+                    if(result.value == ""){
+                        like_span.hide();
+                    }
+                }
+            }
+        }
+    }
+    );
+    return false;
+}
+
+function enableBatchActions(){
+    for(var i=0; i<_GLOBAL_VAR['ditems'].length; i++) {
+        var checker = $("ditemChecker_"+i);
+        if(checker){
+            $("ditemChecker_"+i).style.visibility = "visible";
+        }
+    }
+    $("ditemCheckerAll").style.visibility = "visible";
+
+    var moreActions = $("moreAction_0");
+    if(moreActions){
+        moreActions.style.visibility = "visible";
+    }
+
+    var shareToGroup = $("shareToGroup_0");
+    if(shareToGroup){
+        shareToGroup.style.visibility = "visible";
+    }
+
+    var addToList = $("addToList_0");
+    if(addToList){
+        addToList.style.visibility = "visible";
+    }
+}
+
+
+function getViewport(){
+    // http://andylangton.co.uk/articles/javascript/get-viewport-size-javascript/
+    var viewportwidth;
+    var viewportheight;
+    // the more standards compliant browsers (mozilla/netscape/opera/IE7) use window.innerWidth and window.innerHeight
+    if (typeof window.innerWidth != 'undefined')
+    {
+        viewportwidth = window.innerWidth,
+        viewportheight = window.innerHeight
+    }
+    // IE6 in standards compliant mode (i.e. with a valid doctype as the first line in the document)
+    else if (typeof document.documentElement != 'undefined'
+        && typeof document.documentElement.clientWidth !=
+        'undefined' && document.documentElement.clientWidth != 0)
+        {
+        viewportwidth = document.documentElement.clientWidth,
+        viewportheight = document.documentElement.clientHeight
+    }
+    // older versions of IE
+    else
+    {
+        viewportwidth = document.getElementsByTagName('body')[0].clientWidth,
+        viewportheight = document.getElementsByTagName('body')[0].clientHeight
+    }
+    return [viewportwidth, viewportheight]
+}
+
+function readBookmark(index){
+    openBookmarkReader(index);
+}
+
+function closeBookmarkReader() {
+    Modalbox.hide();
+    window.onresize = null;
+}
+
+function openBookmarkReader(index) {
+
+    var bookmarkReader = new Element("div", {
+        id:"bReader"
+    });
+    
+    var navi = new Element("div", {
+        id:"bReaderNavi"
+    });
+    navi.update('<table><tr><td id="bReaderPagination"></td><td id="bReaderTitle"></td><td id="bReaderActions"></td></tr></table>');
+    bookmarkReader.appendChild(navi);
+    var readerInner = new Element("div", {
+        id:"bReaderInner"
+    });
+    readerInner.appendChild(new Element("iframe", {
+        id:"bReaderIframe",
+        frameBorder:"0"
+    }));
+    bookmarkReader.appendChild(readerInner);
+     
+    var betaInfo = new Element("div", {
+        id:"bReaderBetaInfo",
+        "class" : "alert_info"
+    })
+    betaInfo.update('<b></b> Text View is a beta feature. <a target="_blank" href="http://blog.diigo.com/2010/09/13/introduce-text-view-for-better-readability">Learn more &raquo;</a>');
+    bookmarkReader.appendChild(betaInfo);
+
+    Modalbox.show(bookmarkReader, {
+        title: '',
+        width: 750,
+        overlayOpacity: .8
+    });
+
+    $('bReaderActions').update('<a id="bReaderClose" title="Close" href="javascript:void(0)" onclick="closeBookmarkReader();"></a><a id="bReaderNewWindow" title="Open this page in new window" target="_blank" href="'+_GLOBAL_VAR['ditems'][index].text_view_link+'"></a>');
+    $('bReaderPagination').update('<a id="bReaderPrevItem" title="Previous" href="javascript:void(0)"></a><a id="bReaderNextItem" title="Next" href="javascript:void(0)"></a>')
+    var viewport = getViewport();
+    $('bReaderIframe').setStyle({
+        height: viewport[1] - 130 +'px',
+        width:'100%'
+    });
+    Modalbox.resizeToContent();
+
+    // Handle window resize
+    window.onresize = function(){
+        var viewport = getViewport();
+        $('bReaderIframe') && ($('bReaderIframe').setStyle({
+            height: viewport[1] - 100 +'px'
+        }));
+        Modalbox.resizeToContent();
+    };
+    
+    $('MB_content').setStyle({
+        border:'none'
+    });
+    var mbFrame = $('MB_frame');
+    mbFrame.setStyle({
+        borderTopLeftRadius:0,
+        borderTopRightRadius:0,
+        backgroundColor:'#f5f5f5',
+        paddingBottom: '3px'
+    });
+
+    //IE8 is not support the setProperty function.
+//    mbFrame.style.setProperty('-moz-border-radius', '0 0 7px 7px', '');
+
+    // init Bookmark Reader
+    updateReadBookmarkItem(index);
+
+}
+
+function updateReadBookmarkItem(index){
+    $('bReaderIframe').src = _GLOBAL_VAR['ditems'][index].text_view_link+'&view=embeded';
+    $('bReaderTitle').update('<a title="'+_GLOBAL_VAR['ditems'][index].title+'" href="'+_GLOBAL_VAR['ditems'][index].url+'">'+_GLOBAL_VAR['ditems'][index].title.truncate(60)+'</a>');
+    $('bReaderNewWindow').href = _GLOBAL_VAR['ditems'][index].text_view_link;
+    if(_GLOBAL_VAR['ditems'][index-1] && _GLOBAL_VAR['ditems'][index-1].text_view_link) {
+        $('bReaderPrevItem').title = _GLOBAL_VAR['ditems'][index-1].title;
+        $('bReaderPrevItem').onclick = updateReadBookmarkItem.bind(this, index-1);
+        $('bReaderPrevItem').removeClassName('invalid');
+    }else{
+        $('bReaderPrevItem').title = null;
+        $('bReaderPrevItem').onclick = null;
+        $('bReaderPrevItem').addClassName('invalid');
+    }
+    if(_GLOBAL_VAR['ditems'][index+1] && _GLOBAL_VAR['ditems'][index+1].text_view_link) {
+        $('bReaderNextItem').title = _GLOBAL_VAR['ditems'][index+1].title;
+        $('bReaderNextItem').onclick = updateReadBookmarkItem.bind(this, index+1);
+        $('bReaderNextItem').removeClassName('invalid');
+    }else{
+        $('bReaderNextItem').title = null;
+        $('bReaderNextItem').onclick = null;
+        $('bReaderNextItem').addClassName('invalid');
+    }
+}
+
+
+/* ===================================================================================================
+*   those function is add for diigo V6
+*   Author: Yixi
+*/
+
+/**
+ * set cookie
+ * @param name cookie name
+ * @param value cookie value
+ */
+
+function SetCookie(name,value){
+    delCookie(name);
+    var days = 365;   //default the cookie will save for a year;
+    var exp = new Date();
+    exp.setTime(exp.getTime() + days*24*60*60*1000);
+    document.cookie = name + "=" + escape(value) + ';expires='+exp.toGMTString()+";path=/";
+}
+
+/**
+ * get the cookie by name
+ * @param name the cookie name
+ * @return {String} value the cookie value
+ */
+function GetCookie(name){
+    var arr = document.cookie.match(new RegExp("(^| )"+name+"=([^;]*)(;|$)"));
+    if(arr != null) return unescape(arr[2]); return null;
+}
+
+/**
+ * delete the cookie by name
+ * @param name the cookie name
+ */
+
+function delCookie(name){
+    var exp = new Date();
+    exp.setTime(exp.getTime() - 1);
+    var cval = GetCookie(name);
+    if(cval!=null) document.cookie = name + '='+cval+";expires="+exp.toGMTString()+";path=/";
+}
+
+
+
+
+function showTagCloud(){
+    if(TAGCLOUD && TAGCLOUD.length>1){
+        var pw = new PopWindow({
+            optEnabled:false,
+            center:true,
+            top:0,
+            width:900,
+            title:"Select from your top 300 tags <a href='/cloud/"+_GLOBAL_VAR['username']+"?sort=4'>View all tags</a><a href='/cloud/"+_GLOBAL_VAR['username']+"'>Edit tags</a>",
+            root:this,
+            overflow:true
+        });
+
+        pw.appendNode(getTagCloudDom());
+
+    }
+}
+
+function getTagCloudDom(){
+    var tagcloud = getTagCloudInfo();
+
+    var Div = new Element("div",{
+        className:"popTagCloud"
+    }).update("");
+
+    var ul = new Element("ul",{
+        className:"tagCloud"
+    });
+    var len = tagcloud.length;
+    for(var i=0;i<len;i++){
+        var tagName;
+        if(/\s/.test(tagcloud[i].tName)){
+            tagName = '"'+tagcloud[i].tName +'"';
+        }else{
+            tagName = tagcloud[i].tName;
+        }
+        var li = new Element('li').update("<a title='"+tagcloud[i].count+" bookmarks by myself' class='"+tagcloud[i].level+"' href='/user/"+_GLOBAL_VAR['username']+"/"+encodeURI(tagName)+"?"+_GLOBAL_VAR['url_params_tail']+"'>"+tagcloud[i].tName+"</a>");
+        ul.appendChild(li);
+    }
+    Div.appendChild(ul);
+    return Div;
+}
+
+function getTagCloudInfo(){
+    if(_GLOBAL_VAR['tagcloud']){
+        return _GLOBAL_VAR['tagcloud'];
+    }else{
+        if(TAGCLOUD[0].tName=="no_tag")
+            var max = TAGCLOUD[1].count;
+        else
+            var max = TAGCLOUD[0].count;
+        var min = TAGCLOUD[TAGCLOUD.length-1].count;
+        var len = TAGCLOUD.length;
+
+        for(var i=0;i<len;i++){
+            TAGCLOUD[i].level = getTagCloudLevel(TAGCLOUD[i].count,max,min);
+        }
+
+        TAGCLOUD.sort(function(l,r){
+            if(l.tName.toLowerCase() <= r.tName.toLowerCase())
+                return -1;
+            else
+                return 1;
+        });
+
+
+        _GLOBAL_VAR['tagcloud'] = TAGCLOUD;
+    }
+
+    return _GLOBAL_VAR['tagcloud'];
+}
+
+function getTagCloudLevel(count_,max_,min_){
+    var min = parseInt(min_);
+    var max = parseInt(max_)-min+1;
+    count = parseInt(count_)-min+1;
+    if(count<1) count = 1;
+    min =1;
+    if(max==min) return "popular";
+    var level = Math.round((Math.log(count)-Math.log(min))/(Math.log(max)-Math.log(min))*5);
+    if(level>5) level =5 ;
+    switch(level){
+        case 0:
+            return "notPopular";
+        case 1:
+            return "notVeryPopular";
+        case 2:
+            return "someWhatPopular";
+        case 3:
+            return "popular";
+        case 4:
+            return "veryPopular";
+        case 5:
+            return "ultraPopular";
+
+    }
+}
+
+
+function newList(){
+
+    var pw = new PopWindow({
+        optEnabled:true,
+        center:true,
+        top:0,
+        width:500,
+        title:"Create a new List",
+        root:this
+    });
+
+    pw.appendNode(createNewListTemp());
+    pw.submitBtn.value = "Create";
+//    pw.submit = function(){
+//        document.listForm && document.listForm.submit();
+//    }
+
+    if(window.location.pathname.slice(1,5) == "list"){
+        //in my lists page.
+        pw.submit = function(){
+            document.listForm && document.listForm.submit();
+        }
+    }else{
+        pw.submit = function(){
+            createListByShareContextMenu(Form.serialize($$('form[name=listForm]')[0]));
+            pw.hide();
+        }
+    }
+}
+
+function createNewListTemp(){
+    var form = new Element("form",{
+        action: "/ditem_list/save_list",
+        method:"post",
+        name:"listForm"
+    });
+    var innerDiv = new Element("div",{
+        className:"newlistForm"
+    }).update('<div class="formTitle"><input placeholder="Name" class="inputTxt" type="text" autocomplete="off" name="title"></div><div class="formPrivacy"><span class="r_public"><input type="radio" id="public" name="privacy" checked="checked" value="0" /><label for="public" class="radioLabel">Public</label></span><span class="r_private"><input type="radio" id="private" name="privacy" value="2"><label for="private" class="radioLabel"><b></b>Private</label></span></div><div class="formDesc"><textarea class="inputTxt" name="desc" placeholder="Add a description"></textarea></div>');
+    form.appendChild(innerDiv);
+    return form;
+}
+
+
+/*create list by share list context menu */
+var createListIsSending = false;
+function createListByShareContextMenu(info){
+    var listName = "";
+    if($('listName')){
+        listName = $('listName').value;
+    }
+    if(listName.trim().length>0 || !!info){
+        var params = $H({
+            title:listName,
+            desc:""
+        });
+
+        if(info){
+            params = info;
+        }
+
+        var url = "/ditem_outliner/create_outliner";
+        if(createListIsSending) return;
+        createListIsSending = true;
+        new Ajax.Request(url,{
+            asynchronous:true,
+            evalScripts:false,
+            onComplete:function(reqeust){
+                createListIsSending = false;
+                if(reqeust.responseText == '403'){
+                    outlinerLimit();
+                    return;
+                }
+
+                if(reqeust.status == 200){
+                    var resp = JSON.parse(reqeust.responseText);
+                    var newindex = _GLOBAL_VAR['lists'].length;
+                    insertListinfo({
+                        id:resp.list_id,
+                        index:newindex,
+                        title:resp.title,
+                        uri:resp.uri,
+                        mode:resp.privacy
+                    });
+                }
+            },
+            parameters:params
+
+        });
+    }
+}
+
+function insertListinfo(info){
+    _GLOBAL_VAR['lists'].push(info);
+    if(_GLOBAL_VAR["my_lists"]){
+        _GLOBAL_VAR["my_lists"].push(info);
+    }
+    info.title = _safeHTML(info.title);
+    if($('listName')){
+        $('listName').value = "";
+        var listMenuElement = $("addToListMenu");
+        var hr = listMenuElement.select("hr")[0];
+        var li  = new Element("li").update('<a href="javascript:doAddToListAction(\''+info.index+'\')">'+info.title+'</a>');
+        console.log(li);
+        listMenuElement.insertBefore(li,hr.nextSibling);        
+    }
+    var addToListSelector = $("addToListSelector");
+    if(addToListSelector){
+        var option = new Element("option",{
+            value:info.index
+        }).update(info.title);
+        addToListSelector.appendChild(option);
+        $("addToListSelector").value = info.index;
+        $("addListInputHolder").hide();
+        $("addToListSelector").show();
+        $("newListInEdit").value = "";
+    } 
+}
+
+function _safeHTML(value){
+    value = value.replace(/</g,'&lt;');
+    value = value.replace(/>/g,'&gt;');
+    return value;
+};
+
+function outlinerLimit(){
+    var outliner = jQuery('<div><a href="/premium/pricing_table_details">Upgrade your plan to create more outliners.</a></div>').diigoWP({title:"Upgrade your plan"});
+    outliner.show();
+}
